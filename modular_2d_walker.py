@@ -1,22 +1,18 @@
 #! /usr/bin/python3
 import sys
-import copy
 import pickle
 import numpy as np
 import gym
 import configparser as cp
+import random as rd
 
-import log_fitnesses as lf
+import log_data as ld
 import asynch_ea as asynch
 import novelty as nov
-sys.path.append("tasks/ModularER_2D")
-from Encodings import Network_Encoding as cppn
-from Encodings import LSystem as lsystem
-from DataAnalysis import DataAnalysis as da
-import Tree as tr
 
-import gym_rem2D as rem
-from gym_rem2D.morph import SimpleModule, CircularModule2D
+sys.path.append("modular_2d")
+from modular_2d import individual as mod_ind
+
 
 from deap import creator,base,tools,algorithms
 
@@ -30,75 +26,13 @@ def getEnv():
     return env
 
 
-def get_module_list():
-    module_list = []
-    for i in range(4):
-        module_list.append(SimpleModule.Standard2D())
-    for i in range(4):
-        module_list.append(CircularModule2D.Circular2D())
-    return module_list
 
-
-fitness_data = lf.FitnessData()
-plotter = lf.Plotter()
-
-class Fitness(base.Fitness):
-    def __init__(self):
-        self.weights=[1.0]
-
-class Individual:
-    def __init__(self):
-        self.genome = None
-        self.novelty = Fitness()
-        self.fitness = Fitness()
-        self.age = 0
-        self.config = None
-
-    @staticmethod
-    def clone(individual):
-        self = copy.deepcopy(individual)
-        return self
-
-    @staticmethod
-    def init_for_controller_opti(individual):
-        self = Individual()
-        self = Individual.clone(individual)
-        self.random_controller()
-        return self
-
-    @staticmethod
-    def random(config):
-        # creates a random individual based on the encoding type
-        self = Individual()
-        self.config = config
-        moduleList = get_module_list()
-        self.genome = cppn.NN_enc(moduleList,self.config)
-        
-        self.tree_depth = int(self.config["morphology"]["max_depth"])
-        self.genome.create(self.tree_depth)
-        return self
-
-    def random_controller(self):
-        for mod in self.genome.moduleList:
-            mod.mutate_controller(0.5,0.5)
-
-    def mutate_morphology(morph_mutation_rate,mutation_rate,mut_sigma,self):
-        self.genome.mutate(morph_mutation_rate,mutation_rate,mut_sigma)
-        self.age+=1 #increase age when mutated because it is an offspring
-
-    #To correspond to DEAP API and be able to use EASimple for the controller mutation
-    @staticmethod
-    def mutate_controller(ind,mutation_rate,mut_sigma):
-        for mod in ind.genome.moduleList:
-            mod.mutate_controller(mutation_rate,mut_sigma)
-        return ind,
-       
-
-    def mutate(morph_mutation_rate,mutation_rate,mut_sigma,self):
-        self.mutate_morphology(morph_mutation_rate,mutation_rate,mut_sigma)
-        self, = Individual.mutate_controller(self,mutation_rate,mut_sigma)
-
-
+fitness_data = ld.Data("fitness")
+novelty_data = ld.Data("novelty")
+learning_trials = ld.Data("learning_trials")
+learning_delta = ld.Data("learning_delta")
+plot_fit = ld.Plotter()
+plot_ld = ld.Plotter()
 
 def evaluate(individual, config):
     tree_depth = int(config["morphology"]["max_depth"])
@@ -115,7 +49,7 @@ def evaluate(individual, config):
             raise Exception("Tree depth not defined in evaluation")
     tree = individual.genome.create(tree_depth)
     tree.create_children_lists()
-    env.seed(4)
+    env.seed(int(config["experiment"]["seed"]))
     env.reset(tree=tree, module_list=individual.genome.moduleList)
     it = 0
     for i in range(evaluation_steps):
@@ -136,20 +70,29 @@ def evaluate(individual, config):
             individual.fitness.values = [reward]
     return individual.fitness.values
 
+def identity(a):
+    return a
+
 def learning_loop(individual,config):
     toolbox = base.Toolbox()
-    toolbox.register("individual", Individual.init_for_controller_opti,individual=individual)
+    toolbox.register("individual", mod_ind.Individual.init_for_controller_opti,individual=individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", evaluate,config=config)
-    toolbox.register("mutate", Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
+    toolbox.register("mutate", mod_ind.Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
     toolbox.register("select",tools.selTournament, tournsize = int(config["controller"]["tournament_size"]))
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
-    stats.register("max", np.max)
+    stats.register("max",np.max)
+    stats.register("min",np.min)
+    stats.register("fitness",identity)
     hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    algorithms.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
+    pop, log = algorithms.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
     individual.genome = hof[0].genome
-    return hof[0].fitness.values
+    individual.ctrl_log = log
+    individual.ctrl_pop = pop
+    individual.learning_delta = hof[0].fitness.values[0] - log.select("min")[0]
+    individual.fitness = hof[0].fitness
+    return individual
 
 def elitist_select(pop,size):
     sort_pop = pop
@@ -168,39 +111,48 @@ def generate(parents,toolbox,size):
     offspring = list(map(toolbox.clone, offspring))
     for o in offspring:
         toolbox.mutate(o)
+        o.index=mod_ind.Individual.static_index
+        mod_ind.Individual.static_index+=1
         # TODO only reset fitness to zero when mutation changes individual
         # Implement DEAP built in functionality
-        o.fitness = Fitness()
+        o.fitness = mod_ind.Fitness()
     return offspring
 
-def update_fitness_data(toolbox,population,gen,plot=False,save=False):
+def update_data(toolbox,population,gen,config,plot=False,save=False):
+    log_folder = config["experiment"]["log_folder"]
     fitness_values = [ind.fitness.values[0] for ind in population]
-    fitness_data.add_fitnesses(fitness_values)
+    fitness_data.add_data(fitness_values)
+    goal_select = config["experiment"].getboolean("goal_select")
+    if goal_select == False:
+        novelty_scores = [ind.novelty.values[0] for ind in population]
+        novelty_data.add_data(novelty_scores)
+    learning_deltas = [ind.learning_delta for ind in population]
+    learning_delta.add_data(learning_deltas)
     if plot:
-        plotter.plot(fitness_data)
+        plot_fit.plot(fitness_data)
+        plot_ld.plot(learning_delta)
     if save:
         n_gens=1
         if(gen%n_gens == 0):
-            fitness_data.save("logs/fitnesses")
-            pickle.dump(population,open("logs/pop_" + str(gen), "wb"))
+            fitness_data.save(log_folder + "/fitnesses")
+            learning_delta.save(log_folder + "/learning_delta")
+            if goal_select == False:
+                novelty_data.save(log_folder + "/novelty")
+            pickle.dump(population,open(log_folder + "/pop_" + str(gen), "wb"))
+            mod_ind.save_learning_ctrl_log(population,gen,log_folder)
+            mod_ind.save_learning_ctrl_pop(population,gen,log_folder)
 
-def morphological_distance(ind1,ind2):
-    tree1 = ind1.genome.create(ind1.tree_depth)
-    tree1.create_children_lists()
-    tree2 = ind2.genome.create(ind2.tree_depth)
-    tree2.create_children_lists()
-    return tr.Tree.distance(tree1,tree2)
 
 def compute_novelty_scores(population,archive,config):
     for ind in population:
-        dist = nov.distances(ind,population,archive,morphological_distance)
+        dist = nov.distances(ind,population,archive,mod_ind.morphological_distance)
         ind.novelty.values = nov.sparsness(dist),
     for ind in population:
         archive = nov.update_archive(ind,ind.novelty.values[0],archive,novelty_thr=float(config["novelty"]["nov_thres"]),adding_prob=float(config["novelty"]["adding_prob"]),arch_size=int(config["novelty"]["arch_max_size"]))
 
-def novelty_select(parents,size,archive,tournsize = 4):
-    compute_novelty_scores(parents,archive)
-    return tools.selTournament(parents,size,tournsize,fit_attr="novelty")
+def novelty_select(parents,size,archive,config):
+    compute_novelty_scores(parents,archive,config)
+    return tools.selTournament(parents,size,int(config["morphology"]["tournament_size"]),fit_attr="novelty")
 
 if __name__ == '__main__':
     config = cp.ConfigParser()
@@ -209,18 +161,33 @@ if __name__ == '__main__':
     else:
         config.read("modular_2d_walker.cfg")
 
+    goal_select = config["experiment"].getboolean("goal_select")
+    elitist_survival = config["experiment"].getboolean("elitist_survival")
+
+    #define seed
+    seed = int(os.getrandom(5,flags=os.GRND_RANDOM).hex(),16)
+    rd.seed(a=seed)
+    config["experiment"]["seed"] = str(seed)
+
     archive=[]
 
     toolbox = base.Toolbox()
 
-    toolbox.register("individual", Individual.random,config=config)
+    toolbox.register("individual", mod_ind.Individual.random,config=config)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("eval", learning_loop,config=config)
-    toolbox.register("mutate", Individual.mutate_morphology, float(config["morphology"]["mut_rate"]),float(config["morphology"]["sigma"]))
-    toolbox.register("parent_select",novelty_select, archive=archive ,tournsize = int(config["morphology"]["tournament_size"]))
-    toolbox.register("death_select", elitist_select)
+    toolbox.register("mutate", mod_ind.Individual.mutate_morphology, mutation_rate=float(config["morphology"]["mut_rate"]),mut_sigma=float(config["morphology"]["sigma"]))
+    print()
+    if goal_select: #Do a goal-based selection
+        toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
+    else: #Do a novelty selection.
+        toolbox.register("parent_select",novelty_select, archive=archive ,config=config)
+    if elitist_survival: #Do an elitist survival: remove the worst individual in term of fitness
+        toolbox.register("death_select", elitist_select)
+    else: #Do an age based survival: remove the oldest individual
+        toolbox.register("death_select", age_select)
     toolbox.register("generate",generate)
-    toolbox.register("extra",update_fitness_data,plot=bool(config["experiment"]["plot_prog"]),save=bool(config["experiment"]["save_logs"]))
+    toolbox.register("extra",update_data,config=config,plot=bool(config["experiment"]["plot_prog"]),save=bool(config["experiment"]["save_logs"]))
 
 
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
@@ -228,11 +195,12 @@ if __name__ == '__main__':
     stats.register("std", np.std)
     stats.register("min", np.min)
     stats.register("max", np.max)
-    stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
-    stats_nov.register("avg", np.mean)
-    stats_nov.register("std", np.std)
-    stats_nov.register("min", np.min)
-    stats_nov.register("max", np.max)
+    if goal_select == False:
+        stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
+        stats_nov.register("avg", np.mean)
+        stats_nov.register("std", np.std)
+        stats_nov.register("min", np.min)
+        stats_nov.register("max", np.max)
 
 
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),sync=float(config["morphology"]["synch"]))
@@ -241,4 +209,5 @@ if __name__ == '__main__':
     for i in range(int(config["morphology"]["nbr_gen"])):
         pop = asynch_ea.step(toolbox)
         print("fitness - ",stats.compile(pop))
-        print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
+        if goal_select == False:
+            print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))

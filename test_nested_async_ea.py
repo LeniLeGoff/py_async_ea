@@ -38,7 +38,8 @@ def cmaes_evaluate(individual):
         for ind, fit in zip(pop, fitnesses):
             ind.fitness.values = fit
         toolbox.update(pop)
-    return min([ind.fitness.values for ind in pop])
+    individual.fitness.values = min([ind.fitness.values for ind in pop])
+    return individual
 
 def elitist_select(pop,size):
     sort_pop = pop
@@ -64,6 +65,10 @@ toolbox.register("death_select", elitist_select)
 toolbox.register("parents_select", tools.selTournament, tournsize=3)
 toolbox.register("eval", cmaes_evaluate)
 toolbox.register("generate",asynch.generate)
+def extra(toolbox,pop,iter):#no extra step
+    pass
+toolbox.register("extra",extra)
+
 
 if __name__ == '__main__':
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)

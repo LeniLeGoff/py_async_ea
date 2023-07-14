@@ -12,7 +12,8 @@ from deap import benchmarks
 
 def evaluate(ind):
 	time.sleep(rd.randint(0,10))
-	return benchmarks.rastrigin(ind)
+	ind.fitness.values = benchmarks.rastrigin(ind)
+	return ind
 
 def elitist_select(pop,size):
 	sort_pop = pop
@@ -36,6 +37,9 @@ toolbox.register("death_select", elitist_select)
 toolbox.register("parents_select", tools.selTournament, tournsize=3)
 toolbox.register("eval", evaluate)
 toolbox.register("generate",asynch.generate)
+def extra(toolbox,pop,iter):#no extra step
+	pass
+toolbox.register("extra",extra)
 
 if __name__ == '__main__':
 	stats = tools.Statistics(key=lambda ind: ind.fitness.values)
@@ -43,7 +47,7 @@ if __name__ == '__main__':
 	stats.register("std", numpy.std)
 	stats.register("min", numpy.min)
 	stats.register("max", numpy.max)
-	asynch_ea = asynch.AsynchEA(100,sync=0)
+	asynch_ea = asynch.AsynchEA(20,sync=0)
 	pop = asynch_ea.init(toolbox)
 	print("init finish")
 	for i in range(1000):

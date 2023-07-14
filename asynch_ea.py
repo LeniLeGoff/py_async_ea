@@ -29,7 +29,7 @@ class AsynchEA:
         self.parents = []
         self.pop = []
         self.workers = []
-        self.fitnesses = []
+        self.evaluated_ind = []
         self.iteration = 0
 
     def remove(self,select):
@@ -39,44 +39,43 @@ class AsynchEA:
 
     def worker_callback(self,worker):
         for w in self.workers:
-            if w[0] == worker:
-                self.fitnesses.append([worker.result(),w[1]])
+            if w == worker:
+                self.evaluated_ind.append(worker.result())
                 self.workers.remove(w)
+                return
 
     def asynch_map(self,eval):
         for ind in self.pop:
             is_new_ind = True
             for w in self.workers:
-                if w[1] == ind:
+                if w.args[0] == ind:
                     is_new_ind = False
                     break
             if is_new_ind:
                 worker = futures.submit(eval,ind)
                 worker.add_done_callback(self.worker_callback)
-                self.workers.append([worker,ind])
+                self.workers.append(worker)
 
     def update(self,eval):
         # Evaluate the individuals with asynch map. Evaluate as to return a ref to the ind at the end
         self.asynch_map(eval)
-        jobs = [w[0] for w in self.workers]
         nb_completed = 0
-        for completed in futures.as_completed(jobs):
+        for completed in futures.as_completed(self.workers):
             nb_completed+=1
             if nb_completed == self.nbr_ind_to_wait:
                 break
-        print(len(self.fitnesses))
-        if len(self.fitnesses) >= self.nbr_ind_to_wait:
-            for fit in self.fitnesses:
-                for ind in self.pop:
-                   if ind == fit[1]:
-                        ind.fitness.values = fit[0]
-            self.fitnesses = []
-
+        print(len(self.evaluated_ind))
+        if len(self.evaluated_ind) >= self.nbr_ind_to_wait:
+            for e_ind in self.evaluated_ind:
+                for i in range(len(self.pop)):
+                    if self.pop[i] == e_ind:
+                        self.pop[i] = e_ind
+                        break
+            self.evaluated_ind = []
     
         new_parents = [ind for ind in self.pop if ind.fitness.valid]
         for ind in new_parents:
             self.pop.remove(ind)
-
         return new_parents
 
     def init(self,toolbox):
