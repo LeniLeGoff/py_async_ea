@@ -132,12 +132,12 @@ def update_data(toolbox,population,gen,config,plot=False,save=False):
         plot_fit.plot(fitness_data)
         plot_ld.plot(learning_delta)
     if save:
-        n_gens=1
+        n_gens=int(config["experiment"]["checkpoint_frequency"])
+        fitness_data.save(log_folder + "/fitnesses")
+        learning_delta.save(log_folder + "/learning_delta")
+        if goal_select == False:
+            novelty_data.save(log_folder + "/novelty")
         if(gen%n_gens == 0):
-            fitness_data.save(log_folder + "/fitnesses")
-            learning_delta.save(log_folder + "/learning_delta")
-            if goal_select == False:
-                novelty_data.save(log_folder + "/novelty")
             pickle.dump(population,open(log_folder + "/pop_" + str(gen), "wb"))
             mod_ind.save_learning_ctrl_log(population,gen,log_folder)
             mod_ind.save_learning_ctrl_pop(population,gen,log_folder)
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     else: #Do an age based survival: remove the oldest individual
         toolbox.register("death_select", age_select)
     toolbox.register("generate",generate)
-    toolbox.register("extra",update_data,config=config,plot=bool(config["experiment"]["plot_prog"]),save=bool(config["experiment"]["save_logs"]))
+    toolbox.register("extra",update_data,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
 
 
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
