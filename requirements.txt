@@ -1,0 +1,9 @@
+wheel==0.37.1
+numpy==1.24.4
+scoop==0.7.2
+zss==1.2.0
+neat-python=0.92.0
+gym=0.26.2
+Box2D==2.3.10
+deap==1.4.1
+matplotlib==3.7.2
