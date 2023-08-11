@@ -2,6 +2,8 @@
 
 import matplotlib.pyplot as plt 
 import numpy as np 
+from datetime import datetime
+import os
 
 class Data: 
     def __init__(self,name="data"):
@@ -27,8 +29,24 @@ class Data:
 
     def median(self):
         return [np.median(d) for d in self.data]
+
     def percentile(self,perc):
         return [np.percentile(d,perc) for d in self.data]
+
+def create_log_folder(log_folder,name):
+    time = datetime.today()
+    rd_nb = int(os.getrandom(3,flags=os.GRND_RANDOM).hex(),16)
+    foldername = name + "_" + str(time.year)  \
+                      + "_" + str(time.month) \
+                      + "_" + str(time.day)   \
+                      + "_" + str(time.hour)  \
+                      + "_" + str(time.minute) \
+                      + "_" + str(time.second) \
+                      + "_" + str(time.microsecond) \
+                      + "_" + str(rd_nb)
+    if not os.path.exists(log_folder + "/" + foldername):
+        os.makedirs(log_folder + "/" + foldername)
+    return foldername
 
 class Plotter:
     def __init__(self):

@@ -118,8 +118,7 @@ def generate(parents,toolbox,size):
         o.fitness = mod_ind.Fitness()
     return offspring
 
-def update_data(toolbox,population,gen,config,plot=False,save=False):
-    log_folder = config["experiment"]["log_folder"]
+def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     fitness_values = [ind.fitness.values[0] for ind in population]
     fitness_data.add_data(fitness_values)
     goal_select = config["experiment"].getboolean("goal_select")
@@ -161,6 +160,11 @@ if __name__ == '__main__':
     else:
         config.read("modular_2d_walker.cfg")
 
+    log_folder = config["experiment"]["log_folder"]
+    exp_name = config["experiment"]["name"]
+    foldername = ld.create_log_folder(log_folder,exp_name)
+
+
     goal_select = config["experiment"].getboolean("goal_select")
     elitist_survival = config["experiment"].getboolean("elitist_survival")
 
@@ -187,7 +191,7 @@ if __name__ == '__main__':
     else: #Do an age based survival: remove the oldest individual
         toolbox.register("death_select", age_select)
     toolbox.register("generate",generate)
-    toolbox.register("extra",update_data,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
+    toolbox.register("extra",update_data,log_folder=log_folder + "/" + foldername,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
 
 
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
