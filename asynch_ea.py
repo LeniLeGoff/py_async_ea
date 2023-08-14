@@ -20,7 +20,7 @@ def generate(parents,toolbox,size):
         return offspring
 
 class AsynchEA:
-    def __init__(self,pop_size,sync=0):
+    def __init__(self,pop_size,nb_workers,sync=0):
         self.pop_size = pop_size
         self.nbr_ind_to_wait = int(pop_size)*sync
         if sync == 0:
@@ -31,6 +31,7 @@ class AsynchEA:
         self.workers = []
         self.evaluated_ind = []
         self.iteration = 0
+        self.max_workers = nb_workers
 
     def remove(self,select):
         dead = select(self.parents,len(self.parents)-self.pop_size)
@@ -51,14 +52,17 @@ class AsynchEA:
                 if w.args[0] == ind:
                     is_new_ind = False
                     break
-            if is_new_ind:
+            if is_new_ind and len(self.workers) < self.max_workers:
                 worker = futures.submit(eval,ind)
                 worker.add_done_callback(self.worker_callback)
                 self.workers.append(worker)
+            if len(self.workers) >= self.max_workers:
+                break
 
     def update(self,eval):
         # Evaluate the individuals with asynch map. Evaluate as to return a ref to the ind at the end
         self.asynch_map(eval)
+        print("number of workers",len(self.workers))
         nb_completed = 0
         for completed in futures.as_completed(self.workers):
             nb_completed+=1
@@ -81,8 +85,8 @@ class AsynchEA:
     def init(self,toolbox):
         #initialisation
         self.pop = toolbox.population(self.pop_size)
-        print(len(self.pop))
         while len(self.parents) < self.pop_size:
+            print(len(self.parents),self.pop_size)
             new_par = self.update(toolbox.eval)
             self.parents = self.parents + new_par
         assert(len(self.pop) == 0)

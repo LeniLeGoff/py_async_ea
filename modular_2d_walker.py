@@ -156,10 +156,12 @@ def novelty_select(parents,size,archive,config):
 
 if __name__ == '__main__':
     config = cp.ConfigParser()
-    if(len(sys.argv) == 2):
+    if(len(sys.argv) == 3):
         config.read(sys.argv[1])
     else:
         config.read("modular_2d_walker.cfg")
+
+    max_workers = int(sys.argv[2])
 
     goal_select = config["experiment"].getboolean("goal_select")
     elitist_survival = config["experiment"].getboolean("elitist_survival")
@@ -203,7 +205,7 @@ if __name__ == '__main__':
         stats_nov.register("max", np.max)
 
 
-    asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),sync=float(config["morphology"]["synch"]))
+    asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
     print("init finish")
     for i in range(int(config["morphology"]["nbr_gen"])):
