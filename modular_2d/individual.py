@@ -35,6 +35,7 @@ class Individual:
         self.ctrl_log = None
         self.ctrl_pop = None
         self.learning_delta = 0
+        self.nbr_eval = 0
         self.index = 0
 
     def __eq__(self, other):

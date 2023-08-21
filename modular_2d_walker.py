@@ -1,29 +1,31 @@
 #! /usr/bin/python3
 import sys
+import os
 import pickle
 import numpy as np
 import gym
 import configparser as cp
 import random as rd
+from functools import partial
 
 import log_data as ld
 import asynch_ea as asynch
-import novelty as nov
+from asynch_ea import print
 
-sys.path.append("modular_2d")
+import tools.novelty as nov
 from modular_2d import individual as mod_ind
 
 
 from deap import creator,base,tools,algorithms
 
-env = None
-def getEnv():
-    global env
-    if env is None:
-        #env = M2D.Modular2D()
-        # OpenAI code to register and call gym environment.
-        env = gym.make("Modular2DLocomotion-v0")
-    return env
+#env = None
+#def getEnv():
+#    global env
+#    if env is None:
+#        #env = M2D.Modular2D()
+#        # OpenAI code to register and call gym environment.
+#        env = gym.make("Modular2DLocomotion-v0")
+#    return env
 
 
 
@@ -41,7 +43,7 @@ def evaluate(individual, config):
     headless = bool(config["simulation"]["headless"])
     env_length = int(config["simulation"]["env_length"])
 
-    env = getEnv()
+    env = gym.make("Modular2DLocomotion-v0")
     if tree_depth is None:
         try:
            tree_depth = individual.tree_depth
@@ -68,6 +70,7 @@ def evaluate(individual, config):
             break
         if reward > 0:
             individual.fitness.values = [reward]
+    del env
     return individual.fitness.values
 
 def identity(a):
@@ -92,6 +95,7 @@ def learning_loop(individual,config):
     individual.ctrl_pop = pop
     individual.learning_delta = hof[0].fitness.values[0] - log.select("min")[0]
     individual.fitness = hof[0].fitness
+    individual.nbr_eval = int(config["controller"]["nbr_gen"])
     return individual
 
 def elitist_select(pop,size):
@@ -105,6 +109,7 @@ def age_select(pop,size):
     return sort_pop[:size]
 
 def generate(parents,toolbox,size):
+    print("tournament")
     offspring = toolbox.parent_select(parents, size)
 
     # deep copy of selected population
@@ -141,10 +146,12 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
             mod_ind.save_learning_ctrl_log(population,gen,log_folder)
             mod_ind.save_learning_ctrl_pop(population,gen,log_folder)
 
-
 def compute_novelty_scores(population,archive,config):
     for ind in population:
-        dist = nov.distances(ind,population,archive,mod_ind.morphological_distance)
+        if ind.novelty.valid:
+            continue
+        print("number of cores", int(config["experiment"]["max_workers"]))
+        dist = nov.distances_parallel(population,archive,partial(mod_ind.morphological_distance,ind2=ind),cores=int(config["experiment"]["max_workers"]))
         ind.novelty.values = nov.sparsness(dist),
     for ind in population:
         archive = nov.update_archive(ind,ind.novelty.values[0],archive,novelty_thr=float(config["novelty"]["nov_thres"]),adding_prob=float(config["novelty"]["adding_prob"]),arch_size=int(config["novelty"]["arch_max_size"]))
@@ -155,12 +162,15 @@ def novelty_select(parents,size,archive,config):
 
 if __name__ == '__main__':
     config = cp.ConfigParser()
+    max_workers = 0
     if(len(sys.argv) == 3):
         config.read(sys.argv[1])
+        max_workers = int(sys.argv[2])
     else:
         config.read("modular_2d_walker.cfg")
+        max_workers = int(sys.argv[1])
 
-    max_workers = int(sys.argv[2])
+    config["experiment"]["max_workers"] = str(max_workers)
     
     log_folder = config["experiment"]["log_folder"]
     exp_name = config["experiment"]["name"]
@@ -183,7 +193,6 @@ if __name__ == '__main__':
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("eval", learning_loop,config=config)
     toolbox.register("mutate", mod_ind.Individual.mutate_morphology, mutation_rate=float(config["morphology"]["mut_rate"]),mut_sigma=float(config["morphology"]["sigma"]))
-    print()
     if goal_select: #Do a goal-based selection
         toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
     else: #Do a novelty selection.
@@ -209,11 +218,22 @@ if __name__ == '__main__':
         stats_nov.register("max", np.max)
 
 
+    evaluations_budget = int(config["morphology"]["pop_size"]) \
+                        *int(config["morphology"]["nbr_gen"])  \
+                        *int(config["controller"]["pop_size"]) \
+                        *int(config["controller"]["nbr_gen"])
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
     print("init finish")
-    for i in range(int(config["morphology"]["nbr_gen"])):
-        pop = asynch_ea.step(toolbox)
-        print("fitness - ",stats.compile(pop))
-        if goal_select == False:
-            print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
+    nbr_eval = 0
+    while nbr_eval < evaluations_budget:
+        pop, new_inds = asynch_ea.step(toolbox)
+        if len(new_inds) > 0:
+            for ind in new_inds:
+                nbr_eval += ind.nbr_eval
+            print("fitness - ",stats.compile(pop))
+            if goal_select == False:
+                print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
+            print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
+    asynch_ea.terminate()
+    print("EA has terminated normaly")

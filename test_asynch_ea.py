@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import sys
 import asynch_ea as asynch
 import random as rd
 import time
@@ -42,12 +43,13 @@ def extra(toolbox,pop,iter):#no extra step
 toolbox.register("extra",extra)
 
 if __name__ == '__main__':
+	nb_workers = int(sys.argv[1])
 	stats = tools.Statistics(key=lambda ind: ind.fitness.values)
 	stats.register("avg", numpy.mean)
 	stats.register("std", numpy.std)
 	stats.register("min", numpy.min)
 	stats.register("max", numpy.max)
-	asynch_ea = asynch.AsynchEA(20,sync=0)
+	asynch_ea = asynch.AsynchEA(100,nb_workers,sync=1)
 	pop = asynch_ea.init(toolbox)
 	print("init finish")
 	for i in range(1000):
