@@ -11,6 +11,7 @@ from functools import partial
 import log_data as ld
 import asynch_ea as asynch
 from asynch_ea import print
+import ea_simple as ea
 
 import tools.novelty as nov
 from modular_2d import individual as mod_ind
@@ -18,14 +19,14 @@ from modular_2d import individual as mod_ind
 
 from deap import creator,base,tools,algorithms
 
-#env = None
-#def getEnv():
-#    global env
-#    if env is None:
-#        #env = M2D.Modular2D()
-#        # OpenAI code to register and call gym environment.
-#        env = gym.make("Modular2DLocomotion-v0")
-#    return env
+env = None
+def getEnv():
+    global env
+    if env is None:
+        #env = M2D.Modular2D()
+        #OpenAI code to register and call gym environment.
+        env = gym.make("Modular2DLocomotion-v0")
+    return env
 
 
 
@@ -40,10 +41,10 @@ def evaluate(individual, config):
     tree_depth = int(config["morphology"]["max_depth"])
     evaluation_steps = int(config["simulation"]["evaluation_steps"])
     interval = int(config["simulation"]["render_interval"])
-    headless = bool(config["simulation"]["headless"])
+    headless = config["simulation"].getboolean("headless")
     env_length = int(config["simulation"]["env_length"])
 
-    env = gym.make("Modular2DLocomotion-v0")
+    env = getEnv()
     if tree_depth is None:
         try:
            tree_depth = individual.tree_depth
@@ -70,7 +71,7 @@ def evaluate(individual, config):
             break
         if reward > 0:
             individual.fitness.values = [reward]
-    del env
+   # del env
     return individual.fitness.values
 
 def identity(a):
@@ -89,10 +90,11 @@ def learning_loop(individual,config):
     stats.register("fitness",identity)
     hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log = algorithms.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
+    pop, log = ea.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=True)
     individual.genome = hof[0].genome
     individual.ctrl_log = log
     individual.ctrl_pop = pop
+   # print("pop",[ind.get_controller_genome() for ind in pop])
     individual.learning_delta = hof[0].fitness.values[0] - log.select("min")[0]
     individual.fitness = hof[0].fitness
     individual.nbr_eval = int(config["controller"]["nbr_gen"])

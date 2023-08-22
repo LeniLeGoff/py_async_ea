@@ -84,6 +84,8 @@ class Individual:
             mod.mutate_controller(mutation_rate,mut_sigma)
         return ind,
        
+    def get_controller_genome(self):
+        return [[mod.controller.amplitude,mod.controller.phase,mod.controller.frequency,mod.controller.offset] for mod in self.genome.moduleList] 
 
     def mutate(morph_mutation_rate,mutation_rate,mut_sigma,self):
         self, = Individual.mutate_morphology(self,morph_mutation_rate,mutation_rate,mut_sigma)
