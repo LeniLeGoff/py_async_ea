@@ -65,6 +65,11 @@ class AsynchEA:
             if len(self.in_evaluation) >= self.max_workers:
                 break
 
+    #sequential execution. Use only for debugging
+    def seq_map(self,eval):
+        for ind in self.pop:
+            results = eval(ind)
+            self.evaluated_ind.append(results)
             
     def update(self,eval):
         # Evaluate the individuals with asynch map. Evaluate as to return a ref to the ind at the end
@@ -120,3 +125,5 @@ class AsynchEA:
 
     def terminate():
         self.pool.close()
+        self.pool.join()
+        
