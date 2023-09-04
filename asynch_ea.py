@@ -59,7 +59,7 @@ class AsynchEA:
                     is_new_ind = False
                     break
             if is_new_ind and len(self.in_evaluation) < self.max_workers:
-                print("ind",ind.index,"send to evaluation")
+                #print("ind",ind.index,"send to evaluation")
                 self.in_evaluation.append(ind)
                 self.pool.apply_async(eval,(ind,),callback=self.worker_callback)
             if len(self.in_evaluation) >= self.max_workers:

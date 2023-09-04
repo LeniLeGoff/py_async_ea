@@ -71,7 +71,10 @@ def evaluate(individual, config):
             break
         if reward > 0:
             individual.fitness.values = [reward]
+    individual.nbr_eval += 1
    # del env
+    if config["controller"].getboolean("no_learning"):
+        return individual
     return individual.fitness.values
 
 def identity(a):
@@ -83,7 +86,9 @@ def learning_loop(individual,config):
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", evaluate,config=config)
     toolbox.register("mutate", mod_ind.Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
-    toolbox.register("select",tools.selTournament, tournsize = int(config["controller"]["tournament_size"]))
+    toolbox.register("select",tools.selTournament, tournsize=int(config["controller"]["tournament_size"]))
+    #pool = mp.Pool(processes=int(config["experiment"]["max_workers"]))
+    #toolbox.register("map",pool.map)
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
     stats.register("max",np.max)
     stats.register("min",np.min)
@@ -97,7 +102,7 @@ def learning_loop(individual,config):
    # print("pop",[ind.get_controller_genome() for ind in pop])
     individual.learning_delta = hof[0].fitness.values[0] - log.select("min")[0]
     individual.fitness = hof[0].fitness
-    individual.nbr_eval = int(config["controller"]["nbr_gen"])
+    #individual.nbr_eval = int(config["controller"]["nbr_gen"])
     return individual
 
 def elitist_select(pop,size):
@@ -140,19 +145,20 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     if save:
         n_gens=int(config["experiment"]["checkpoint_frequency"])
         fitness_data.save(log_folder + "/fitnesses")
-        learning_delta.save(log_folder + "/learning_delta")
+        if not config["controller"].getboolean("no_learning"):
+            learning_delta.save(log_folder + "/learning_delta")
         if goal_select == False:
             novelty_data.save(log_folder + "/novelty")
         if(gen%n_gens == 0):
             pickle.dump(population,open(log_folder + "/pop_" + str(gen), "wb"))
-            mod_ind.save_learning_ctrl_log(population,gen,log_folder)
-            mod_ind.save_learning_ctrl_pop(population,gen,log_folder)
+            if not config["controller"].getboolean("no_learning"):
+                mod_ind.save_learning_ctrl_log(population,gen,log_folder)
+                mod_ind.save_learning_ctrl_pop(population,gen,log_folder)
 
 def compute_novelty_scores(population,archive,config):
     for ind in population:
         if ind.novelty.valid:
             continue
-        print("number of cores", int(config["experiment"]["max_workers"]))
         dist = nov.distances_parallel(population,archive,partial(mod_ind.morphological_distance,ind2=ind),cores=int(config["experiment"]["max_workers"]))
         ind.novelty.values = nov.sparsness(dist),
     for ind in population:
@@ -187,13 +193,19 @@ if __name__ == '__main__':
     rd.seed(a=seed)
     config["experiment"]["seed"] = str(seed)
 
+    no_learning = config["controller"].getboolean("no_learning")
+
     archive=[]
 
     toolbox = base.Toolbox()
 
     toolbox.register("individual", mod_ind.Individual.random,config=config)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("eval", learning_loop,config=config)
+    if no_learning:
+        toolbox.register("eval", evaluate,config=config)
+    else:
+        toolbox.register("learning_loop", evaluate,config=config)
+
     toolbox.register("mutate", mod_ind.Individual.mutate_morphology, mutation_rate=float(config["morphology"]["mut_rate"]),mut_sigma=float(config["morphology"]["sigma"]))
     if goal_select: #Do a goal-based selection
         toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
@@ -219,14 +231,18 @@ if __name__ == '__main__':
         stats_nov.register("min", np.min)
         stats_nov.register("max", np.max)
 
+    with open(log_folder + "/" + foldername + "/config.cfg",'w') as configfile :
+        config.write(configfile)
 
     evaluations_budget = int(config["morphology"]["pop_size"]) \
-                        *int(config["morphology"]["nbr_gen"])  \
-                        *int(config["controller"]["pop_size"]) \
-                        *int(config["controller"]["nbr_gen"])
+                        *int(config["morphology"]["nbr_gen"])  
+    if not config["controller"].getboolean("no_learning"):
+        evaluations_budget *= int(config["controller"]["pop_size"]) \
+                           *int(config["controller"]["nbr_gen"])
+    
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
-    print("init finish")
+    print("init finish, running for", evaluations_budget, "evaluations")
     nbr_eval = 0
     while nbr_eval < evaluations_budget:
         pop, new_inds = asynch_ea.step(toolbox)
