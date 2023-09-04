@@ -72,7 +72,6 @@ def evaluate(individual, config):
         if reward > 0:
             individual.fitness.values = [reward]
     individual.nbr_eval += 1
-   # del env
     if config["controller"].getboolean("no_learning"):
         return individual
     return individual.fitness.values
@@ -124,6 +123,7 @@ def generate(parents,toolbox,size):
     for o in offspring:
         toolbox.mutate(o)
         o.index=mod_ind.Individual.static_index
+        o.nbr_eval = 0
         mod_ind.Individual.static_index+=1
         # TODO only reset fitness to zero when mutation changes individual
         # Implement DEAP built in functionality
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     if no_learning:
         toolbox.register("eval", evaluate,config=config)
     else:
-        toolbox.register("learning_loop", evaluate,config=config)
+        toolbox.register("eval", learning_loop,config=config)
 
     toolbox.register("mutate", mod_ind.Individual.mutate_morphology, mutation_rate=float(config["morphology"]["mut_rate"]),mut_sigma=float(config["morphology"]["sigma"]))
     if goal_select: #Do a goal-based selection
@@ -244,6 +244,8 @@ if __name__ == '__main__':
     pop = asynch_ea.init(toolbox)
     print("init finish, running for", evaluations_budget, "evaluations")
     nbr_eval = 0
+    for ind in pop:
+        nbr_eval += ind.nbr_eval
     while nbr_eval < evaluations_budget:
         pop, new_inds = asynch_ea.step(toolbox)
         if len(new_inds) > 0:
