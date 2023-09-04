@@ -123,7 +123,7 @@ class AsynchEA:
 
         return self.parents, new_par
 
-    def terminate():
+    def terminate(self):
         self.pool.close()
         self.pool.join()
         
