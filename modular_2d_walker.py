@@ -15,11 +15,9 @@ import ea_simple as ea
 
 import tools.novelty as nov
 from modular_2d import individual as mod_ind
-import gc
 
 from deap import creator,base,tools,algorithms
 
-#from pympler.tracker import SummaryTracker
 
 #env = None
 #def getEnv():
@@ -179,9 +177,7 @@ def novelty_select(parents,size,archive,config):
     compute_novelty_scores(parents,archive,config)
     return tools.selTournament(parents,size,int(config["morphology"]["tournament_size"]),fit_attr="novelty")
 
-if __name__ == '__main__':
-    #summary_tracker = SummaryTracker()
-    
+if __name__ == '__main__':    
     config = cp.ConfigParser()
     max_workers = 0
     if(len(sys.argv) == 3):
@@ -257,7 +253,6 @@ if __name__ == '__main__':
     for ind in pop:
         nbr_eval += ind.nbr_eval
     while nbr_eval < evaluations_budget:
-        #summary_tracker.print_diff()
         pop, new_inds = asynch_ea.step(toolbox)
         if len(new_inds) > 0:
             for ind in new_inds:

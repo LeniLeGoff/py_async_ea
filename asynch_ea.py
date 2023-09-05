@@ -5,9 +5,6 @@ import multiprocessing as mp
 from deap import algorithms
 import builtins
 
-from pympler.classtracker import ClassTracker
-
-
 def print(*objects):
     string = "" 
     for o in objects:
