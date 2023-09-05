@@ -1,10 +1,12 @@
 #! /usr/bin/python3
 
 import random as rd
-
 import multiprocessing as mp
 from deap import algorithms
 import builtins
+
+from pympler.classtracker import ClassTracker
+
 
 def print(*objects):
     string = "" 
@@ -16,10 +18,10 @@ def generate(parents,toolbox,size):
         ''' generate takes a list already evaluated parents and the size of the offspring to generate'''
 
         #select the individuals from the offspring will be produced
-        offspring = toolbox.parents_select(parents, size)
+        selected_parents = toolbox.parents_select(parents, size)
     
         # Clone the selected individuals
-        offspring = list(map(toolbox.clone, offspring))
+        offspring = list(map(toolbox.clone, selected_parents))
 
         # Apply crossover and mutation on the offspring
         offspring = algorithms.varAnd(offspring, toolbox, 0.1, 0.2)
@@ -39,13 +41,14 @@ class AsynchEA:
         self.evaluated_ind = []
         self.iteration = 0
         self.max_workers = nb_workers
-        self.pool = mp.Pool(processes=nb_workers)
+        self.pool = mp.Pool(processes=nb_workers,maxtasksperchild=100)
         self.in_evaluation = []
 
     def remove(self,select):
         dead = select(self.parents,len(self.parents)-self.pop_size)
         for ind in dead:
             self.parents.remove(ind) 
+            del ind
 
     def worker_callback(self,results):
         self.evaluated_ind.append(results)
@@ -81,6 +84,7 @@ class AsynchEA:
                     if self.pop[i] == e_ind:
                         self.pop[i] = e_ind
                         break
+            del self.evaluated_ind
             self.evaluated_ind = []
     
         new_parents = [ind for ind in self.pop if ind.fitness.valid]
@@ -88,6 +92,7 @@ class AsynchEA:
             print("new_parents",[ind.index for ind in new_parents])
         for ind in new_parents:
             self.pop.remove(ind)
+
         return new_parents
 
     def init(self,toolbox):

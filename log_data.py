@@ -24,6 +24,9 @@ class Data:
     def add_data(self,fit):
         self.data.append(fit)
 
+    def depop(self):
+        del self.data[0]
+
     def avg(self):
         return [np.average(d) for d in self.data]
 

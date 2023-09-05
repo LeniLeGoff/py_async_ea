@@ -23,7 +23,7 @@ def update_archive(ind,novelty,archive,novelty_thr=0.9,adding_prob=0.4,arch_size
     if novelty > novelty_thr or random.random() > adding_prob:
         archive.append(ind)
     if arch_size > 0 and len(archive) > arch_size:
-        archive = archive[:len(archive)-arch_size]
+        del archive[:len(archive)-arch_size]
     return archive
 
 def distances(ind,pop,arch,dist_fct):

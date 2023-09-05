@@ -103,7 +103,8 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, stats=None,
             halloffame.update(offspring)
 
         # Replace the current population by the offspring
-        population[:] = offspring
+        del population
+        population = offspring
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}

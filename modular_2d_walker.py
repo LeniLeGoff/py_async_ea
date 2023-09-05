@@ -15,24 +15,27 @@ import ea_simple as ea
 
 import tools.novelty as nov
 from modular_2d import individual as mod_ind
-
+import gc
 
 from deap import creator,base,tools,algorithms
 
-env = None
-def getEnv():
-    global env
-    if env is None:
+#from pympler.tracker import SummaryTracker
+
+#env = None
+#def getEnv():
+    #global env
+    #if env is None:
         #env = M2D.Modular2D()
-        #OpenAI code to register and call gym environment.
-        env = gym.make("Modular2DLocomotion-v0")
-    return env
+       #OpenAI code to register and call gym environment.
+    #    env = gym.make("Modular2DLocomotion-v0")
+    #return env
 
 
 
 fitness_data = ld.Data("fitness")
+ind_index_data = ld.Data("indexes")
 novelty_data = ld.Data("novelty")
-learning_trials = ld.Data("learning_trials")
+#learning_trials = ld.Data("learning_trials")
 learning_delta = ld.Data("learning_delta")
 plot_fit = ld.Plotter()
 plot_ld = ld.Plotter()
@@ -44,7 +47,7 @@ def evaluate(individual, config):
     headless = config["simulation"].getboolean("headless")
     env_length = int(config["simulation"]["env_length"])
 
-    env = getEnv()
+    env = gym.make("Modular2DLocomotion-v0")
     if tree_depth is None:
         try:
            tree_depth = individual.tree_depth
@@ -72,6 +75,7 @@ def evaluate(individual, config):
         if reward > 0:
             individual.fitness.values = [reward]
     individual.nbr_eval += 1
+    del env
     if config["controller"].getboolean("no_learning"):
         return individual
     return individual.fitness.values
@@ -94,14 +98,14 @@ def learning_loop(individual,config):
     stats.register("fitness",identity)
     hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log = ea.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=True)
+    pop, log = ea.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
     individual.genome = hof[0].genome
     individual.ctrl_log = log
-    individual.ctrl_pop = pop
+    individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
    # print("pop",[ind.get_controller_genome() for ind in pop])
     individual.learning_delta = hof[0].fitness.values[0] - log.select("min")[0]
     individual.fitness = hof[0].fitness
-    #individual.nbr_eval = int(config["controller"]["nbr_gen"])
+    individual.nbr_eval = sum(log.select("nevals"))
     return individual
 
 def elitist_select(pop,size):
@@ -116,10 +120,10 @@ def age_select(pop,size):
 
 def generate(parents,toolbox,size):
     print("tournament")
-    offspring = toolbox.parent_select(parents, size)
+    selected_parents = toolbox.parent_select(parents, size)
 
     # deep copy of selected population
-    offspring = list(map(toolbox.clone, offspring))
+    offspring = list(map(toolbox.clone, selected_parents))
     for o in offspring:
         toolbox.mutate(o)
         o.index=mod_ind.Individual.static_index
@@ -133,6 +137,8 @@ def generate(parents,toolbox,size):
 def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     fitness_values = [ind.fitness.values[0] for ind in population]
     fitness_data.add_data(fitness_values)
+    indexes = [ind.index for ind in population]
+    ind_index_data.add_data(indexes)
     goal_select = config["experiment"].getboolean("goal_select")
     if goal_select == False:
         novelty_scores = [ind.novelty.values[0] for ind in population]
@@ -145,10 +151,15 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     if save:
         n_gens=int(config["experiment"]["checkpoint_frequency"])
         fitness_data.save(log_folder + "/fitnesses")
+        fitness_data.depop()
+        ind_index_data.save(log_folder + "/indexes")
+        ind_index_data.depop()
         if not config["controller"].getboolean("no_learning"):
             learning_delta.save(log_folder + "/learning_delta")
+            learning_delta.depop()
         if goal_select == False:
             novelty_data.save(log_folder + "/novelty")
+            novelty_data.depop()
         if(gen%n_gens == 0):
             pickle.dump(population,open(log_folder + "/pop_" + str(gen), "wb"))
             if not config["controller"].getboolean("no_learning"):
@@ -169,6 +180,8 @@ def novelty_select(parents,size,archive,config):
     return tools.selTournament(parents,size,int(config["morphology"]["tournament_size"]),fit_attr="novelty")
 
 if __name__ == '__main__':
+    #summary_tracker = SummaryTracker()
+    
     config = cp.ConfigParser()
     max_workers = 0
     if(len(sys.argv) == 3):
@@ -219,6 +232,7 @@ if __name__ == '__main__':
     toolbox.register("extra",update_data,log_folder=log_folder + "/" + foldername,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
 
 
+
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
     stats.register("avg", np.mean)
     stats.register("std", np.std)
@@ -234,11 +248,7 @@ if __name__ == '__main__':
     with open(log_folder + "/" + foldername + "/config.cfg",'w') as configfile :
         config.write(configfile)
 
-    evaluations_budget = int(config["morphology"]["pop_size"]) \
-                        *int(config["morphology"]["nbr_gen"])  
-    if not config["controller"].getboolean("no_learning"):
-        evaluations_budget *= int(config["controller"]["pop_size"]) \
-                           *int(config["controller"]["nbr_gen"])
+    evaluations_budget = int(config["experiment"]["evaluations_budget"])
     
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
@@ -247,6 +257,7 @@ if __name__ == '__main__':
     for ind in pop:
         nbr_eval += ind.nbr_eval
     while nbr_eval < evaluations_budget:
+        #summary_tracker.print_diff()
         pop, new_inds = asynch_ea.step(toolbox)
         if len(new_inds) > 0:
             for ind in new_inds:
@@ -255,5 +266,6 @@ if __name__ == '__main__':
             if goal_select == False:
                 print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
             print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
+
     asynch_ea.terminate()
     print("EA has terminated normaly")
