@@ -3,9 +3,10 @@ import sys
 import os
 import pickle
 import numpy as np
-import gym
 import configparser as cp
 import random as rd
+import gym
+
 from functools import partial
 
 import log_data as ld
@@ -16,19 +17,7 @@ import ea_simple as ea
 import tools.novelty as nov
 from modular_2d import individual as mod_ind
 
-from deap import creator,base,tools,algorithms
-
-
-#env = None
-#def getEnv():
-    #global env
-    #if env is None:
-        #env = M2D.Modular2D()
-       #OpenAI code to register and call gym environment.
-    #    env = gym.make("Modular2DLocomotion-v0")
-    #return env
-
-
+from deap import base,tools
 
 fitness_data = ld.Data("fitness")
 ind_index_data = ld.Data("indexes")
@@ -38,6 +27,15 @@ learning_delta = ld.Data("learning_delta")
 plot_fit = ld.Plotter()
 plot_ld = ld.Plotter()
 
+env = None
+def getEnv():
+    global env
+    if env is None:
+        #env = M2D.Modular2D()
+       #OpenAI code to register and call gym environment.
+        env = gym.make("Modular2DLocomotion-v0")
+    return env
+
 def evaluate(individual, config):
     tree_depth = int(config["morphology"]["max_depth"])
     evaluation_steps = int(config["simulation"]["evaluation_steps"])
@@ -45,7 +43,7 @@ def evaluate(individual, config):
     headless = config["simulation"].getboolean("headless")
     env_length = int(config["simulation"]["env_length"])
 
-    env = gym.make("Modular2DLocomotion-v0")
+    env = getEnv()
     if tree_depth is None:
         try:
            tree_depth = individual.tree_depth
@@ -73,7 +71,7 @@ def evaluate(individual, config):
         if reward > 0:
             individual.fitness.values = [reward]
     individual.nbr_eval += 1
-    del env
+   # del env
     if config["controller"].getboolean("no_learning"):
         return individual
     return individual.fitness.values
@@ -124,12 +122,12 @@ def generate(parents,toolbox,size):
     offspring = list(map(toolbox.clone, selected_parents))
     for o in offspring:
         toolbox.mutate(o)
-        o.index=mod_ind.Individual.static_index
+        o.index= mod_ind.Individual.static_index
         o.nbr_eval = 0
         mod_ind.Individual.static_index+=1
         # TODO only reset fitness to zero when mutation changes individual
         # Implement DEAP built in functionality
-        o.fitness = mod_ind.Fitness()
+        o.fitness = Fitness()
     return offspring
 
 def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
@@ -226,7 +224,6 @@ if __name__ == '__main__':
         toolbox.register("death_select", age_select)
     toolbox.register("generate",generate)
     toolbox.register("extra",update_data,log_folder=log_folder + "/" + foldername,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
-
 
 
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)

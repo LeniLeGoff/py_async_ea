@@ -38,7 +38,7 @@ class AsynchEA:
         self.evaluated_ind = []
         self.iteration = 0
         self.max_workers = nb_workers
-        self.pool = mp.Pool(processes=nb_workers,maxtasksperchild=100)
+        self.pool = mp.Pool(processes=nb_workers)#,maxtasksperchild=100)
         self.in_evaluation = []
 
     def remove(self,select):

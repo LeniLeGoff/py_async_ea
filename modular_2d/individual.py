@@ -50,6 +50,7 @@ class Individual:
     def init_for_controller_opti(individual):
         self = Individual()
         self = Individual.clone(individual)
+        self.fitness = Fitness()
         self.random_controller()
         return self
 
@@ -69,7 +70,7 @@ class Individual:
 
     def random_controller(self):
         for mod in self.genome.moduleList:
-            mod.mutate_controller(0.5,0.5)
+            mod.mutate_controller(0.2,0.04)
 
     @staticmethod
     def mutate_morphology(ind,mutation_rate,mut_sigma):
