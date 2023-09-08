@@ -37,6 +37,7 @@ class Individual:
         self.learning_delta = 0
         self.nbr_eval = 0
         self.index = 0
+        self.tree = None
 
     def __eq__(self, other):
         return self.index == other
@@ -47,11 +48,12 @@ class Individual:
         return self
 
     @staticmethod
-    def init_for_controller_opti(individual):
+    def init_for_controller_opti(individual,config):
         self = Individual()
         self = Individual.clone(individual)
+        self.create_tree(config)
         self.fitness = Fitness()
-        self.random_controller()
+        self.random_controller(config)
         return self
 
     @staticmethod
@@ -68,9 +70,16 @@ class Individual:
         self.genome.create(self.tree_depth)
         return self
 
-    def random_controller(self):
-        for mod in self.genome.moduleList:
-            mod.mutate_controller(0.2,0.04)
+    def random_controller(self,config):
+        mut_rate = float(config["controller"]["mut_rate"])
+        sigma = float(config["controller"]["sigma"])
+        for node in self.tree.nodes:
+            node.controller.mutate(1,0.1,self.tree.moduleList[node.type].angle)
+
+    def create_tree(self,config):
+        tree_depth = int(config["morphology"]["max_depth"])
+        self.tree = self.genome.create(tree_depth)
+        self.tree.create_children_lists()
 
     @staticmethod
     def mutate_morphology(ind,mutation_rate,mut_sigma):
@@ -81,12 +90,13 @@ class Individual:
     #To correspond to DEAP API and be able to use EASimple for the controller mutation
     @staticmethod
     def mutate_controller(ind,mutation_rate,mut_sigma):
-        for mod in ind.genome.moduleList:
-            mod.mutate_controller(mutation_rate,mut_sigma)
+        for node in ind.tree.nodes:
+            node.controller.mutate(mutation_rate,mut_sigma,ind.tree.moduleList[node.type].angle)
+
         return ind,
        
     def get_controller_genome(self):
-        return [[mod.controller.amplitude,mod.controller.phase,mod.controller.frequency,mod.controller.offset] for mod in self.genome.moduleList] 
+        return [[node.controller.amplitude,node.controller.phase,node.controller.frequency,node.controller.offset] for node in self.tree.nodes] 
 
     def mutate(morph_mutation_rate,mutation_rate,mut_sigma,self):
         self, = Individual.mutate_morphology(self,morph_mutation_rate,mutation_rate,mut_sigma)

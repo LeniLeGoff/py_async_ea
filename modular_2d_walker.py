@@ -6,6 +6,7 @@ import numpy as np
 import configparser as cp
 import random as rd
 import gym
+import multiprocessing as mp
 
 from functools import partial
 
@@ -18,6 +19,7 @@ import tools.novelty as nov
 from modular_2d import individual as mod_ind
 
 from deap import base,tools
+
 
 fitness_data = ld.Data("fitness")
 ind_index_data = ld.Data("indexes")
@@ -37,22 +39,16 @@ def getEnv():
     return env
 
 def evaluate(individual, config):
-    tree_depth = int(config["morphology"]["max_depth"])
     evaluation_steps = int(config["simulation"]["evaluation_steps"])
     interval = int(config["simulation"]["render_interval"])
     headless = config["simulation"].getboolean("headless")
     env_length = int(config["simulation"]["env_length"])
 
     env = getEnv()
-    if tree_depth is None:
-        try:
-           tree_depth = individual.tree_depth
-        except:
-            raise Exception("Tree depth not defined in evaluation")
-    tree = individual.genome.create(tree_depth)
-    tree.create_children_lists()
+    if config["controller"].getboolean("no_learning"):
+        individual.create_tree(config)
     env.seed(int(config["experiment"]["seed"]))
-    env.reset(tree=tree, module_list=individual.genome.moduleList)
+    env.reset(tree=individual.tree, module_list=individual.tree.moduleList)
     it = 0
     for i in range(evaluation_steps):
         it+=1
@@ -60,7 +56,7 @@ def evaluate(individual, config):
             if not headless:
                 env.render()
 
-        action = np.ones_like(env.action_space.sample())
+        action = [1,1,1,1] #not used here
         observation, reward, done, info  = env.step(action)
         if reward< -10:
             break
@@ -71,7 +67,6 @@ def evaluate(individual, config):
         if reward > 0:
             individual.fitness.values = [reward]
     individual.nbr_eval += 1
-   # del env
     if config["controller"].getboolean("no_learning"):
         return individual
     return individual.fitness.values
@@ -80,13 +75,14 @@ def identity(a):
     return a
 
 def learning_loop(individual,config):
+    individual.create_tree(config)
     toolbox = base.Toolbox()
-    toolbox.register("individual", mod_ind.Individual.init_for_controller_opti,individual=individual)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register("individual", mod_ind.Individual.init_for_controller_opti,individual=individual,config=config)
+    toolbox.register("population", ea.seeded_init_repeat,list,toolbox.individual,[individual])
     toolbox.register("evaluate", evaluate,config=config)
     toolbox.register("mutate", mod_ind.Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
-    toolbox.register("select",tools.selTournament, tournsize=int(config["controller"]["tournament_size"]))
-    #pool = mp.Pool(processes=int(config["experiment"]["max_workers"]))
+    toolbox.register("select",tools.selBest)
+    #pool = mp.Pool()
     #toolbox.register("map",pool.map)
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
     stats.register("max",np.max)
@@ -94,12 +90,12 @@ def learning_loop(individual,config):
     stats.register("fitness",identity)
     hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log = ea.eaSimple(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
+    pop, log, seed_fitness = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
     individual.genome = hof[0].genome
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
    # print("pop",[ind.get_controller_genome() for ind in pop])
-    individual.learning_delta = hof[0].fitness.values[0] - log.select("min")[0]
+    individual.learning_delta = hof[0].fitness.values[0] - seed_fitness
     individual.fitness = hof[0].fitness
     individual.nbr_eval = sum(log.select("nevals"))
     return individual
@@ -127,7 +123,7 @@ def generate(parents,toolbox,size):
         mod_ind.Individual.static_index+=1
         # TODO only reset fitness to zero when mutation changes individual
         # Implement DEAP built in functionality
-        o.fitness = Fitness()
+        o.fitness = mod_ind.Fitness()
     return offspring
 
 def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
