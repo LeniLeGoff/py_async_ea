@@ -27,7 +27,7 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
     if verbose:
         print(logbook.stream)
     if var < 0.0001:
-        return population, logbook
+        return population, logbook, seed_fitness
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # Select the next generation individuals
