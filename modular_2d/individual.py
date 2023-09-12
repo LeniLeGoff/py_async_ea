@@ -8,6 +8,7 @@ from deap import base
 sys.path.append("tasks/ModularER_2D")
 from Encodings import Network_Encoding as cppn
 from Encodings import LSystem as lsystem
+from Encodings import Direct_Encoding as de
 import Tree as tr
 import gym_rem2D as rem
 from gym_rem2D.morph import simple_module, circular_module
@@ -64,15 +65,21 @@ class Individual:
         Individual.static_index+=1
         self.config = config
         moduleList = get_module_list()
-        self.genome = cppn.NN_enc(moduleList,self.config)
+        encoding = config["morphology"]["encoding"]
+        if encoding == "cppn":
+            self.genome = cppn.NN_enc(moduleList,config)
+        elif encoding == "lsystem":
+            self.genome = lsystem.LSystem(moduleList,config)
+        elif encoding == "direct":
+            self.genome = de.DirectEncoding(moduleList,config)
         
         self.tree_depth = int(self.config["morphology"]["max_depth"])
         self.genome.create(self.tree_depth)
+        self.create_tree(config)
+        self.random_controller(config)
         return self
 
     def random_controller(self,config):
-        mut_rate = float(config["controller"]["mut_rate"])
-        sigma = float(config["controller"]["sigma"])
         for node in self.tree.nodes:
             node.controller.mutate(1,0.1,self.tree.moduleList[node.type].angle)
 
@@ -92,15 +99,17 @@ class Individual:
     def mutate_controller(ind,mutation_rate,mut_sigma):
         for node in ind.tree.nodes:
             node.controller.mutate(mutation_rate,mut_sigma,ind.tree.moduleList[node.type].angle)
-
         return ind,
        
     def get_controller_genome(self):
         return [[node.controller.amplitude,node.controller.phase,node.controller.frequency,node.controller.offset] for node in self.tree.nodes] 
 
-    def mutate(morph_mutation_rate,mutation_rate,mut_sigma,self):
-        self, = Individual.mutate_morphology(self,morph_mutation_rate,mutation_rate,mut_sigma)
-        self, = Individual.mutate_controller(self,mutation_rate,mut_sigma)
+    @staticmethod
+    def mutate(ind,morph_mutation_rate,morph_sigma,ctrl_mutation_rate,ctrl_sigma,config):
+        ind.mutate_morphology(ind,morph_mutation_rate,morph_sigma)
+        ind.create_tree(config)
+        ind.mutate_controller(ind,ctrl_mutation_rate,ctrl_sigma)
+        return ind,
 
     def ctrl_log_to_string(self):
         ctrl_fits = self.ctrl_log.select("fitness")
