@@ -206,10 +206,19 @@ if __name__ == '__main__':
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     if no_learning:
         toolbox.register("eval", evaluate,config=config)
+        toolbox.register("mutate", mod_ind.Individual.mutate, \
+                            morph_mutation_rate=float(config["morphology"]["mut_rate"]),\
+                            morph_sigma=float(config["morphology"]["sigma"]),\
+                            ctrl_mutation_rate=float(config["controller"]["mut_rate"]),\
+                            ctrl_sigma=float(config["controller"]["sigma"]), \
+                            config=config)
     else:
         toolbox.register("eval", learning_loop,config=config)
+        toolbox.register("mutate", mod_ind.Individual.mutate_morphology,\
+                            mutation_rate=float(config["morphology"]["mut_rate"]),\
+                            mut_sigma=float(config["morphology"]["sigma"]))
 
-    toolbox.register("mutate", mod_ind.Individual.mutate_morphology, mutation_rate=float(config["morphology"]["mut_rate"]),mut_sigma=float(config["morphology"]["sigma"]))
+
     if goal_select: #Do a goal-based selection
         toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
     else: #Do a novelty selection.
