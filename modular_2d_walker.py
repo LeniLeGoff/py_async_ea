@@ -88,15 +88,14 @@ def learning_loop(individual,config):
     stats.register("max",np.max)
     stats.register("min",np.min)
     stats.register("fitness",identity)
-    hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log, seed_fitness = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
-    individual.genome = hof[0].genome
+    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=True)
+    individual.genome = best_ind.genome
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
    # print("pop",[ind.get_controller_genome() for ind in pop])
-    individual.learning_delta = hof[0].fitness.values[0] - seed_fitness
-    individual.fitness = hof[0].fitness
+    individual.learning_delta = best_ind.fitness.values[0] - seed_fitness
+    individual.fitness = best_ind.fitness
     individual.nbr_eval = sum(log.select("nevals"))
     return individual
 
