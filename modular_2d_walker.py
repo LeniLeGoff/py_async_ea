@@ -24,7 +24,7 @@ from deap import base,tools
 fitness_data = ld.Data("fitness")
 ind_index_data = ld.Data("indexes")
 novelty_data = ld.Data("novelty")
-#learning_trials = ld.Data("learning_trials")
+learning_trials = ld.Data("learning_trials")
 learning_delta = ld.Data("learning_delta")
 plot_fit = ld.Plotter()
 plot_ld = ld.Plotter()
@@ -136,6 +136,9 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         novelty_data.add_data(novelty_scores)
     learning_deltas = [ind.learning_delta for ind in population]
     learning_delta.add_data(learning_deltas)
+    lts = [ind.nbr_eval for ind in population]
+    learning_trials.add_data(lts)
+    
     if plot:
         plot_fit.plot(fitness_data)
         plot_ld.plot(learning_delta)
@@ -148,6 +151,8 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         if not config["controller"].getboolean("no_learning"):
             learning_delta.save(log_folder + "/learning_delta")
             learning_delta.depop()
+            learning_trials.save(log_folder + "/learning_trials")
+            learning_trials.depop()
         if goal_select == False:
             novelty_data.save(log_folder + "/novelty")
             novelty_data.depop()
