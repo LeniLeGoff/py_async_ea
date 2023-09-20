@@ -4,11 +4,19 @@ import numpy as np
 def seeded_init_repeat(container,func,seed,n):
     return  seed + container(func() for _ in range(n-1))
 
+def update_best(best_ind,pop):
+    for ind in pop:
+        if(ind.fitness.values[0] > best_ind.fitness.values[0]):
+            best_ind = ind
+    return best_ind
+
 def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
-             halloffame=None, verbose=__debug__):
+                     verbose=__debug__):
     
     logbook = tools.Logbook()
     logbook.header = ['gen', 'nevals'] + (stats.fields if stats else [])
+
+    
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
@@ -18,16 +26,14 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
         ind.fitness.values = fit
 
     seed_fitness = population[0].fitness.values[0]
-
-    if halloffame is not None:
-        halloffame.update(population)
-
+    best_ind = population[0]
+    best_ind = update_best(best_ind,population)
     record = stats.compile(population) if stats else {}
     logbook.record(gen=0, nevals=len(invalid_ind), **record)
     if verbose:
         print(logbook.stream)
     if var < 0.0001:
-        return population, logbook, seed_fitness
+        return population, logbook, seed_fitness, best_ind
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # Select the next generation individuals
@@ -45,9 +51,8 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
 
-        # Update the hall of fame with the generated individuals
-        if halloffame is not None:
-            halloffame.update(offspring)
+        # Update best inidividual ever seen
+        best_ind = update_best(best_ind,offspring)
 
         # Replace the current population by the offspring
         population.sort(key=lambda ind:ind.fitness.values[0],reverse=True)
@@ -63,4 +68,4 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
         if var < 0.0001:
             break
 
-    return population, logbook, seed_fitness
+    return population, logbook, seed_fitness, best_ind

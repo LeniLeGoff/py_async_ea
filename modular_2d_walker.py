@@ -24,7 +24,7 @@ from deap import base,tools
 fitness_data = ld.Data("fitness")
 ind_index_data = ld.Data("indexes")
 novelty_data = ld.Data("novelty")
-#learning_trials = ld.Data("learning_trials")
+learning_trials = ld.Data("learning_trials")
 learning_delta = ld.Data("learning_delta")
 plot_fit = ld.Plotter()
 plot_ld = ld.Plotter()
@@ -88,15 +88,14 @@ def learning_loop(individual,config):
     stats.register("max",np.max)
     stats.register("min",np.min)
     stats.register("fitness",identity)
-    hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log, seed_fitness = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=False)
-    individual.genome = hof[0].genome
+    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False)
+    individual.genome = best_ind.genome
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
    # print("pop",[ind.get_controller_genome() for ind in pop])
-    individual.learning_delta = hof[0].fitness.values[0] - seed_fitness
-    individual.fitness = hof[0].fitness
+    individual.learning_delta = best_ind.fitness.values[0] - seed_fitness
+    individual.fitness = best_ind.fitness
     individual.nbr_eval = sum(log.select("nevals"))
     return individual
 
@@ -137,6 +136,9 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         novelty_data.add_data(novelty_scores)
     learning_deltas = [ind.learning_delta for ind in population]
     learning_delta.add_data(learning_deltas)
+    lts = [ind.nbr_eval for ind in population]
+    learning_trials.add_data(lts)
+    
     if plot:
         plot_fit.plot(fitness_data)
         plot_ld.plot(learning_delta)
@@ -149,6 +151,8 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         if not config["controller"].getboolean("no_learning"):
             learning_delta.save(log_folder + "/learning_delta")
             learning_delta.depop()
+            learning_trials.save(log_folder + "/learning_trials")
+            learning_trials.depop()
         if goal_select == False:
             novelty_data.save(log_folder + "/novelty")
             novelty_data.depop()

@@ -94,7 +94,6 @@ if __name__ == '__main__':
     stats.register("max",np.max)
     stats.register("min",np.min)
     stats.register("fitness",identity)
-    hof = tools.HallOfFame(1)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,halloffame=hof,verbose=True)
+    pop, log = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=True)
   
