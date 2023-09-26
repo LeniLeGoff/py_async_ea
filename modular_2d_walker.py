@@ -89,7 +89,7 @@ def learning_loop(individual,config):
     stats.register("min",np.min)
     stats.register("fitness",identity)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False)
+    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False,min_fit=6,target_fit=60)
     individual.genome = best_ind.genome
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
