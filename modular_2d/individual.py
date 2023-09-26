@@ -28,7 +28,7 @@ class Fitness(base.Fitness):
 class Individual:
     static_index = 0
     def __init__(self):
-        self.genome = None
+        #self.genome = None
         self.novelty = Fitness()
         self.fitness = Fitness()
         self.age = 0
