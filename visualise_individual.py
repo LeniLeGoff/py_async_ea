@@ -1,11 +1,8 @@
 #! /usr/bin/python3
-#! /usr/bin/python3
 import sys
 import pickle
 from modular_2d import individual as mod_ind
-from modular_2d import evaluate as mod_eval
 import configparser as cp
-from deap import base,tools
 import numpy as np
 import ea_simple as ea
 import gym
