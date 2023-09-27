@@ -26,6 +26,7 @@ ind_index_data = ld.Data("indexes")
 novelty_data = ld.Data("novelty")
 learning_trials = ld.Data("learning_trials")
 learning_delta = ld.Data("learning_delta")
+morph_norm = ld.Data("morph_norms")
 plot_fit = ld.Plotter()
 plot_ld = ld.Plotter()
 
@@ -134,11 +135,9 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     if goal_select == False:
         novelty_scores = [ind.novelty.values[0] for ind in population]
         novelty_data.add_data(novelty_scores)
-    learning_deltas = [ind.learning_delta for ind in population]
-    learning_delta.add_data(learning_deltas)
-    lts = [ind.nbr_eval for ind in population]
-    learning_trials.add_data(lts)
-    
+    learning_delta.add_data([ind.learning_delta for ind in population])
+    learning_trials.add_data( [ind.nbr_eval for ind in population])
+    morph_norm.add_data([ind.tree.norm() for ind in population])
     if plot:
         plot_fit.plot(fitness_data)
         plot_ld.plot(learning_delta)
@@ -148,6 +147,8 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         fitness_data.depop()
         ind_index_data.save(log_folder + "/indexes")
         ind_index_data.depop()
+        morph_norm.save(log_folder + "/morph_norms")
+        morph_norm.depop()
         if not config["controller"].getboolean("no_learning"):
             learning_delta.save(log_folder + "/learning_delta")
             learning_delta.depop()
@@ -204,8 +205,8 @@ if __name__ == '__main__':
 
     archive=[]
 
-    toolbox = base.Toolbox()
 
+    toolbox = base.Toolbox()
     toolbox.register("individual", mod_ind.Individual.random,config=config)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     if no_learning:

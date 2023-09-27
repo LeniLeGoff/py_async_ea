@@ -10,7 +10,6 @@ from Encodings import Network_Encoding as cppn
 from Encodings import LSystem as lsystem
 from Encodings import Direct_Encoding as de
 import Tree as tr
-import gym_rem2D as rem
 from gym_rem2D.morph import simple_module, circular_module
 
 def get_module_list():
