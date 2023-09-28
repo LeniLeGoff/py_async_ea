@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 import sys
 import os
+import time
 import pickle
 import numpy as np
 import configparser as cp
@@ -21,6 +22,7 @@ from modular_2d import individual as mod_ind
 from deap import base,tools
 
 
+time_data = ld.Data("time_data")
 fitness_data = ld.Data("fitness")
 ind_index_data = ld.Data("indexes")
 novelty_data = ld.Data("novelty")
@@ -133,6 +135,7 @@ def generate(parents,toolbox,size):
     return offspring
 
 def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
+    time_data.add_data([time.time()])
     fitness_values = [ind.fitness.values[0] for ind in population]
     fitness_data.add_data(fitness_values)
     indexes = [ind.index for ind in population]
@@ -148,6 +151,8 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         plot_fit.plot(fitness_data)
         plot_ld.plot(learning_delta)
     if save:
+        time_data.save(log_folder + "/time_data")
+        time_data.depop()
         n_gens=int(config["experiment"]["checkpoint_frequency"])
         fitness_data.save(log_folder + "/fitnesses")
         fitness_data.depop()
