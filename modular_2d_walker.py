@@ -90,12 +90,18 @@ def learning_loop(individual,config):
     stats.register("min",np.min)
     stats.register("fitness",identity)
     pop = toolbox.population(int(config["controller"]["pop_size"]))
-    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False,min_fit=6,target_fit=float(config["controller"]["target_fit"]))
+    target_fit = float(config["controller"]["target_fit"])
+    if(target_fit == -1):
+        target_fit = None
+    target_delta = float(config["controller"]["target_delta"])
+    if target_delta == -1:
+        target_delta = None
+    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False,min_fit=6,target_fit=target_fit,target_delta=target_delta)
     individual.genome = best_ind.genome
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
    # print("pop",[ind.get_controller_genome() for ind in pop])
-    individual.learning_delta = best_ind.fitness.values[0] - seed_fitness
+    individual.learning_delta.values = best_ind.fitness.values[0] - seed_fitness,
     individual.fitness = best_ind.fitness
     individual.nbr_eval = sum(log.select("nevals"))
     return individual
@@ -135,7 +141,7 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     if goal_select == False:
         novelty_scores = [ind.novelty.values[0] for ind in population]
         novelty_data.add_data(novelty_scores)
-    learning_delta.add_data([ind.learning_delta for ind in population])
+    learning_delta.add_data([ind.learning_delta.values[0] for ind in population])
     learning_trials.add_data( [ind.nbr_eval for ind in population])
     morph_norm.add_data([ind.tree.norm() for ind in population])
     if plot:
@@ -176,6 +182,8 @@ def novelty_select(parents,size,archive,config):
     compute_novelty_scores(parents,archive,config)
     return tools.selTournament(parents,size,int(config["morphology"]["tournament_size"]),fit_attr="novelty")
 
+
+
 if __name__ == '__main__':    
     config = cp.ConfigParser()
     max_workers = 0
@@ -193,7 +201,7 @@ if __name__ == '__main__':
     foldername = ld.create_log_folder(log_folder,exp_name)
 
 
-    goal_select = config["experiment"].getboolean("goal_select")
+    select_type = config["experiment"]["select_type"]
     elitist_survival = config["experiment"].getboolean("elitist_survival")
 
     #define seed
@@ -224,10 +232,12 @@ if __name__ == '__main__':
                             mut_sigma=float(config["morphology"]["sigma"]))
 
 
-    if goal_select: #Do a goal-based selection
+    if select_type == "goal": #Do a goal-based selection
         toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
-    else: #Do a novelty selection.
+    elif select_type == "novelty": #Do a novelty selection.
         toolbox.register("parent_select",novelty_select, archive=archive ,config=config)
+    elif select_type == "delta":
+        toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]),fit_attr="learning_delta")
     if elitist_survival: #Do an elitist survival: remove the worst individual in term of fitness
         toolbox.register("death_select", elitist_select)
     else: #Do an age based survival: remove the oldest individual
@@ -241,7 +251,7 @@ if __name__ == '__main__':
     stats.register("std", np.std)
     stats.register("min", np.min)
     stats.register("max", np.max)
-    if goal_select == False:
+    if select_type == "novelty":
         stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
         stats_nov.register("avg", np.mean)
         stats_nov.register("std", np.std)
@@ -265,7 +275,7 @@ if __name__ == '__main__':
             for ind in new_inds:
                 nbr_eval += ind.nbr_eval
             print("fitness - ",stats.compile(pop))
-            if goal_select == False:
+            if select_type == "novelty":
                 print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
             print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
 

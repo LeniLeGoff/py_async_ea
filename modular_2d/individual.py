@@ -34,7 +34,7 @@ class Individual:
         self.config = None
         self.ctrl_log = None
         self.ctrl_pop = None
-        self.learning_delta = 0
+        self.learning_delta = Fitness()
         self.nbr_eval = 0
         self.index = 0
         self.tree = None

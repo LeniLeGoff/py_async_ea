@@ -11,7 +11,7 @@ def update_best(best_ind,pop):
     return best_ind
 
 def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
-                     verbose=__debug__,min_fit=0,target_fit=10000):#todo change min_fit and target_fit for minimisation case
+                     verbose=__debug__,min_fit=0,target_fit=None,target_delta=None):#todo change min_fit and target_fit for minimisation case
 
     
     logbook = tools.Logbook()
@@ -39,7 +39,12 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
     logbook.record(gen=0, nevals=len(invalid_ind), **record)
     if verbose:
         print(logbook.stream)
-    if var < 0.0001 or best_ind.fitness.values[0] >= target_fit:
+    stop = var < 0.0001 #if all the fitness in the simulation are very close
+    if(target_fit != None):
+        stop = stop or best_ind.fitness.values[0] >= target_fit
+    if(target_delta != None):
+        stop = stop or best_ind.fitness.values[0] - seed_fitness >= target_delta
+    if stop:
         return population, logbook, seed_fitness, best_ind
     # Begin the generational process
     for gen in range(1, ngen + 1):
@@ -72,8 +77,12 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         if verbose:
             print(logbook.stream,var)
-
-        if var < 0.0001 or best_ind.fitness.values[0] >= target_fit:
-            break
-
+        stop = var < 0.0001 #if all the fitness in the simulation are very close
+        if(target_fit != None):
+            stop = stop or best_ind.fitness.values[0] >= target_fit
+        if(target_delta != None):
+            stop = stop or best_ind.fitness.values[0] - seed_fitness >= target_delta
+        if stop:
+            break 
+        
     return population, logbook, seed_fitness, best_ind
