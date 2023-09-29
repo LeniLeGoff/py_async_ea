@@ -2,6 +2,7 @@
 
 import random as rd
 import multiprocessing as mp
+from nestable_pool import NestablePool
 from deap import algorithms
 import builtins
 
@@ -34,11 +35,10 @@ class AsynchEA:
         print("number ind to wait:", self.nbr_ind_to_wait)
         self.parents = []
         self.pop = []
-        self.workers = []
         self.evaluated_ind = []
         self.iteration = 0
         self.max_workers = nb_workers
-        self.pool = mp.Pool(processes=nb_workers)#,maxtasksperchild=100)
+        self.pool = NestablePool(processes=nb_workers)#,maxtasksperchild=100)
         self.in_evaluation = []
 
     def remove(self,select):
@@ -73,6 +73,7 @@ class AsynchEA:
             
     def update(self,eval):
         # Evaluate the individuals with asynch map. Evaluate as to return a ref to the ind at the end
+        #self.seq_map(eval)
         self.asynch_map(eval)
         if len(self.evaluated_ind) >= self.nbr_ind_to_wait:
             print("number individual evaluated",len(self.evaluated_ind))
@@ -128,4 +129,3 @@ class AsynchEA:
     def terminate(self):
         self.pool.close()
         self.pool.join()
-        

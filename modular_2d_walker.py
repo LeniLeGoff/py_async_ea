@@ -85,8 +85,8 @@ def learning_loop(individual,config):
     toolbox.register("evaluate", evaluate,config=config)
     toolbox.register("mutate", mod_ind.Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
     toolbox.register("select",tools.selBest)
-    #pool = mp.Pool()
-    #toolbox.register("map",pool.map)
+    pool = mp.Pool(processes=int(config["controller"]["pop_size"]))
+    toolbox.register("map",pool.map)
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
     stats.register("max",np.max)
     stats.register("min",np.min)
@@ -102,11 +102,12 @@ def learning_loop(individual,config):
     individual.genome = best_ind.genome
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
-   # print("pop",[ind.get_controller_genome() for ind in pop])
+    # print("pop",[ind.get_controller_genome() for ind in pop])
     individual.learning_delta.values = best_ind.fitness.values[0] - seed_fitness,
     individual.fitness = best_ind.fitness
     individual.nbr_eval = sum(log.select("nevals"))
     return individual
+
 
 def elitist_select(pop,size):
     sort_pop = pop
