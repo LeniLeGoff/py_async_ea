@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-
+import sys
 import random as rd
 import multiprocessing as mp
 from nestable_pool import NestablePool
@@ -40,6 +40,7 @@ class AsynchEA:
         self.max_workers = nb_workers
         self.pool = NestablePool(processes=nb_workers)#,maxtasksperchild=100)
         self.in_evaluation = []
+        self.workers_failed = False
 
     def remove(self,select):
         dead = select(self.parents,len(self.parents)-self.pop_size)
@@ -47,9 +48,18 @@ class AsynchEA:
             self.parents.remove(ind) 
             del ind
 
-    def worker_callback(self,results):
-        self.evaluated_ind.append(results)
-        self.in_evaluation.remove(results)
+    def worker_callback(self,results):     
+        if results == None:
+            self.workers_failed = True
+        else:
+            self.evaluated_ind.append(results)
+            self.in_evaluation.remove(results)
+    
+    def error_callback(self,results):
+        self.pool.terminate()
+        exit(1)
+
+
 
     def asynch_map(self,eval):
         for ind in self.pop:
@@ -61,7 +71,7 @@ class AsynchEA:
             if is_new_ind and len(self.in_evaluation) < self.max_workers:
                 #print("ind",ind.index,"send to evaluation")
                 self.in_evaluation.append(ind)
-                self.pool.apply_async(eval,(ind,),callback=self.worker_callback)
+                self.pool.apply_async(eval,(ind,),callback=self.worker_callback)#,error_callback=self.error_callback)
             if len(self.in_evaluation) >= self.max_workers:
                 break
 
@@ -75,6 +85,10 @@ class AsynchEA:
         # Evaluate the individuals with asynch map. Evaluate as to return a ref to the ind at the end
         #self.seq_map(eval)
         self.asynch_map(eval)
+        if self.workers_failed:
+            self.terminate()
+            sys.exit("Exiting because of workers crash")
+
         if len(self.evaluated_ind) >= self.nbr_ind_to_wait:
             print("number individual evaluated",len(self.evaluated_ind))
             for e_ind in self.evaluated_ind:
@@ -127,5 +141,5 @@ class AsynchEA:
         return self.parents, new_par
 
     def terminate(self):
-        self.pool.close()
+        self.pool.terminate()
         self.pool.join()
