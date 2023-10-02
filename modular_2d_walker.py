@@ -144,12 +144,13 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     fitness_data.add_data(fitness_values)
     indexes = [ind.index for ind in population]
     ind_index_data.add_data(indexes)
-    goal_select = config["experiment"].getboolean("goal_select")
-    if goal_select == False:
+    select_type = config["experiment"]["select_type"]
+    if select_type == "novelty":
         novelty_scores = [ind.novelty.values[0] for ind in population]
         novelty_data.add_data(novelty_scores)
-    learning_delta.add_data([ind.learning_delta.values[0] for ind in population])
-    learning_trials.add_data( [ind.nbr_eval for ind in population])
+    if not config["controller"].getboolean("no_learning"):
+        learning_delta.add_data([ind.learning_delta.values[0] for ind in population])
+        learning_trials.add_data( [ind.nbr_eval for ind in population])
     morph_norm.add_data([ind.tree.norm() for ind in population])
     if plot:
         plot_fit.plot(fitness_data)
@@ -169,7 +170,7 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
             learning_delta.depop()
             learning_trials.save(log_folder + "/learning_trials")
             learning_trials.depop()
-        if goal_select == False:
+        if select_type == "novelty":
             novelty_data.save(log_folder + "/novelty")
             novelty_data.depop()
         if(gen%n_gens == 0):

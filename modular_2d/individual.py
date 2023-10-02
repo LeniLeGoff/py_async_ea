@@ -73,8 +73,8 @@ class Individual:
             self.genome = de.DirectEncoding(moduleList,config)
         
         self.tree_depth = int(self.config["morphology"]["max_depth"])
-        self.genome.create(self.tree_depth)
-        self.create_tree(config)
+        self.tree = self.genome.create(self.tree_depth)
+        self.tree.create_children_lists()
         self.random_controller(config)
         return self
 
