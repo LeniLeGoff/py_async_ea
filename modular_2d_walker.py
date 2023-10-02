@@ -11,6 +11,7 @@ import multiprocessing as mp
 
 from functools import partial
 
+from exception import LogExceptions
 import log_data as ld
 import asynch_ea as asynch
 from asynch_ea import print
@@ -78,40 +79,37 @@ def identity(a):
     return a
 
 def learning_loop(individual,config):
-    try:
-        individual.create_tree(config)
-        toolbox = base.Toolbox()
-        toolbox.register("individual", mod_ind.Individual.init_for_controller_opti,individual=individual,config=config)
-        toolbox.register("population", ea.seeded_init_repeat,list,toolbox.individual,[individual])
-        toolbox.register("evaluate", evaluate,config=config)
-        toolbox.register("mutate", mod_ind.Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
-        toolbox.register("select",tools.selBest)
-        pool = mp.Pool(processes=int(config["controller"]["pop_size"]))
-        toolbox.register("map",pool.map)
-        stats = tools.Statistics(key=lambda ind: ind.fitness.values)
-        stats.register("max",np.max)
-        stats.register("min",np.min)
-        stats.register("fitness",identity)
-        pop = toolbox.population(int(config["controller"]["pop_size"]))
-        target_fit = float(config["controller"]["target_fit"])
-        if(target_fit == -1):
-            target_fit = None
-        target_delta = float(config["controller"]["target_delta"])
-        if target_delta == -1:
-            target_delta = None
-        pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False,min_fit=6,target_fit=target_fit,target_delta=target_delta)
-        individual.genome = best_ind.genome
-        individual.ctrl_log = log
-        individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
-        # print("pop",[ind.get_controller_genome() for ind in pop])
-        individual.learning_delta.values = best_ind.fitness.values[0] - seed_fitness,
-        individual.fitness = best_ind.fitness
-        individual.nbr_eval = sum(log.select("nevals"))
-        return individual
-    except Exception as e:
-        print("Worker stopped : ", e)
-        #raise Exception()
-        return None
+    individual.create_tree(config)
+    toolbox = base.Toolbox()
+    toolbox.register("individual", mod_ind.Individual.init_for_controller_opti,individual=individual,config=config)
+    toolbox.register("population", ea.seeded_init_repeat,list,toolbox.individual,[individual])
+    toolbox.register("evaluate", LogExceptions(evaluate),config=config)
+    toolbox.register("mutate", mod_ind.Individual.mutate_controller, mutation_rate = float(config["controller"]["mut_rate"]),mut_sigma = float(config["controller"]["sigma"]))
+    toolbox.register("select",tools.selBest)
+    pool = mp.Pool(processes=int(config["controller"]["pop_size"]))
+    toolbox.register("map",pool.map)
+    stats = tools.Statistics(key=lambda ind: ind.fitness.values)
+    stats.register("max",np.max)
+    stats.register("min",np.min)
+    stats.register("fitness",identity)
+    pop = toolbox.population(int(config["controller"]["pop_size"]))
+    target_fit = float(config["controller"]["target_fit"])
+    if(target_fit == -1):
+        target_fit = None
+    target_delta = float(config["controller"]["target_delta"])
+    if target_delta == -1:
+        target_delta = None
+    pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False,min_fit=6,target_fit=target_fit,target_delta=target_delta)
+    individual.genome = best_ind.genome
+    individual.ctrl_log = log
+    individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
+    # print("pop",[ind.get_controller_genome() for ind in pop])
+    individual.learning_delta.values = best_ind.fitness.values[0] - seed_fitness,
+    individual.fitness = best_ind.fitness
+    individual.nbr_eval = sum(log.select("nevals"))
+    pool.terminate()
+    pool.join()
+    return individual
 
 
 def elitist_select(pop,size):

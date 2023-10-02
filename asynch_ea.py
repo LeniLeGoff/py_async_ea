@@ -4,6 +4,7 @@ import random as rd
 import multiprocessing as mp
 from nestable_pool import NestablePool
 from deap import algorithms
+from exception import LogExceptions
 import builtins
 
 def print(*objects):
@@ -54,11 +55,7 @@ class AsynchEA:
         else:
             self.evaluated_ind.append(results)
             self.in_evaluation.remove(results)
-    
-    def error_callback(self,results):
-        self.pool.terminate()
-        exit(1)
-
+ 
 
 
     def asynch_map(self,eval):
@@ -71,7 +68,7 @@ class AsynchEA:
             if is_new_ind and len(self.in_evaluation) < self.max_workers:
                 #print("ind",ind.index,"send to evaluation")
                 self.in_evaluation.append(ind)
-                self.pool.apply_async(eval,(ind,),callback=self.worker_callback)#,error_callback=self.error_callback)
+                self.pool.apply_async(LogExceptions(eval),(ind,),callback=self.worker_callback)
             if len(self.in_evaluation) >= self.max_workers:
                 break
 
