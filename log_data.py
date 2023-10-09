@@ -10,6 +10,8 @@ class Data:
         self.data = []
         self.name = name
     def save(self, filename):
+        if len(self.data) == 0:
+            return
         with open(filename,'a') as file:
             for f in self.data[-1][:-1]:
                 file.write(str(f) + ",")
@@ -25,7 +27,8 @@ class Data:
         self.data.append(fit)
 
     def depop(self):
-        del self.data[0]
+        if len(self.data) != 0:
+            del self.data[0]
 
     def avg(self):
         return [np.average(d) for d in self.data]

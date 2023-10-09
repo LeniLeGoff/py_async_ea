@@ -25,7 +25,8 @@ from deap import base,tools
 
 time_data = ld.Data("time_data")
 fitness_data = ld.Data("fitness")
-ind_index_data = ld.Data("indexes")
+parents_index_data = ld.Data("parent_indexes")
+eval_index_data = ld.Data("evaluted_indexes")
 novelty_data = ld.Data("novelty")
 learning_trials = ld.Data("learning_trials")
 learning_delta = ld.Data("learning_delta")
@@ -143,7 +144,7 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
     fitness_values = [ind.fitness.values[0] for ind in population]
     fitness_data.add_data(fitness_values)
     indexes = [ind.index for ind in population]
-    ind_index_data.add_data(indexes)
+    parents_index_data.add_data(indexes)
     select_type = config["experiment"]["select_type"]
     if select_type == "novelty":
         novelty_scores = [ind.novelty.values[0] for ind in population]
@@ -161,8 +162,10 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         n_gens=int(config["experiment"]["checkpoint_frequency"])
         fitness_data.save(log_folder + "/fitnesses")
         fitness_data.depop()
-        ind_index_data.save(log_folder + "/indexes")
-        ind_index_data.depop()
+        parents_index_data.save(log_folder + "/parent_indexes")
+        parents_index_data.depop()
+        eval_index_data.save(log_folder + "/new_ind_indexes")
+        eval_index_data.depop()
         morph_norm.save(log_folder + "/morph_norms")
         morph_norm.depop()
         if not config["controller"].getboolean("no_learning"):
@@ -281,7 +284,10 @@ if __name__ == '__main__':
         nbr_eval += ind.nbr_eval
     while nbr_eval < evaluations_budget:
         pop, new_inds = asynch_ea.step(toolbox)
+
         if len(new_inds) > 0:
+            new_idx = [ind.index for ind in new_inds]
+            eval_index_data.add_data(new_idx)
             for ind in new_inds:
                 nbr_eval += ind.nbr_eval
             print("fitness - ",stats.compile(pop))
