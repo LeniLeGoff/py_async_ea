@@ -23,7 +23,7 @@ def steady_state_ea(population, toolbox, cxpb, mutpb, ngen, stats=None,
     best_ind = population[0]
 
     if(population[0].fitness.values[0] <= min_fit):
-        return population, logbook, seed_fitness, best_ind
+        return population, None, seed_fitness, best_ind
 
 
     # Evaluate the individuals with an invalid fitness

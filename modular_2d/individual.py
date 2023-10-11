@@ -133,6 +133,8 @@ def save_learning_ctrl_log(pop,gen,log_folder):
         os.makedirs(foldername)
 
     for ind,index in zip(pop,range(len(pop))):
+        if ind.ctrl_log is None:
+            continue
         with open(foldername + "/ctrl_log_" + str(index),'w') as file:
             file.write(ind.ctrl_log_to_string())
 
@@ -143,6 +145,8 @@ def save_learning_ctrl_pop(pop,gen,log_folder):
         os.makedirs(foldername)
 
     for ind,index in zip(pop,range(len(pop))):
+        if ind.ctrl_log is None:
+            continue
         pickle.dump(ind.ctrl_pop,open(foldername + "/ctrl_pop_" + str(index), "wb"))
 
 

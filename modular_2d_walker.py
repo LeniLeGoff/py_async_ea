@@ -107,7 +107,10 @@ def learning_loop(individual,config):
     # print("pop",[ind.get_controller_genome() for ind in pop])
     individual.learning_delta.values = best_ind.fitness.values[0] - seed_fitness,
     individual.fitness = best_ind.fitness
-    individual.nbr_eval = sum(log.select("nevals"))
+    if log is None:
+        individual.nbr_eval = 1    
+    else:
+        individual.nbr_eval = sum(log.select("nevals"))
     pool.terminate()
     pool.join()
     return individual
@@ -293,6 +296,7 @@ if __name__ == '__main__':
             print("fitness - ",stats.compile(pop))
             if select_type == "novelty":
                 print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
+            print("nbr eval",nbr_eval)
             print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
 
     asynch_ea.terminate()
