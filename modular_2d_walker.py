@@ -101,7 +101,7 @@ def learning_loop(individual,config):
     if target_delta == -1:
         target_delta = None
     pop, log, seed_fitness, best_ind = ea.steady_state_ea(pop,toolbox,cxpb=0,mutpb=1,ngen=int(config["controller"]["nbr_gen"]),stats=stats,verbose=False,min_fit=6,target_fit=target_fit,target_delta=target_delta)
-    individual.genome = best_ind.genome
+    individual = best_ind
     individual.ctrl_log = log
     individual.ctrl_pop = [ind.get_controller_genome() for ind in pop]
     # print("pop",[ind.get_controller_genome() for ind in pop])

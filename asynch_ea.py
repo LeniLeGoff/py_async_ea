@@ -55,8 +55,6 @@ class AsynchEA:
         else:
             self.evaluated_ind.append(results)
             self.in_evaluation.remove(results)
- 
-
 
     def asynch_map(self,eval):
         for ind in self.pop:
