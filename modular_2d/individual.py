@@ -103,6 +103,13 @@ class Individual:
     def get_controller_genome(self):
         return [[node.controller.amplitude,node.controller.phase,node.controller.frequency,node.controller.offset] for node in self.tree.nodes] 
 
+    def set_controller_parameters(self,params):
+        for i in range(len(params)):
+            self.tree.nodes[i].controller.amplitude = params[i][0]
+            self.tree.nodes[i].controller.phase = params[i][1]
+            self.tree.nodes[i].controller.frequency = params[i][2]
+            self.tree.nodes[i].controller.offset = params[i][3] 
+
     @staticmethod
     def mutate(ind,morph_mutation_rate,morph_sigma,ctrl_mutation_rate,ctrl_sigma,config):
         ind.mutate_morphology(ind,morph_mutation_rate,morph_sigma)

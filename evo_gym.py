@@ -1,13 +1,15 @@
 #! /usr/bin/python3
 import sys
 import os
-import pickle
+# import pickle
 import numpy as np
 import configparser as cp
 import random as rd
 import gym
-import multiprocessing as mp
+# import multiprocessing as mp
+import evogym.envs
 from evo_gym import individual as eg_ind
+
 #sys.path.append("task")
 #from evogym import individual
 
@@ -37,20 +39,19 @@ def evaluate(individual, config):
 
     env = gym.make('Walker-v0', body=individual.structure)
     env.reset()
-
+    it = 0
     for i in range(evaluation_steps):   
-        action = env.action_space.sample()
+        action = env.action_space.sample() - 1 
         ob, reward, done, info = env.step(action)
-        it+=1
-        if it % interval == 0 or it == 1:
-            if not headless:
-                env.render()()
+        if not headless:
+            env.render()
 
         if done:
             individual.fitness.values = [reward]
             env.reset()
+            env.close()
             break
-
+    individual.nbr_eval+=1
     return individual
 
 
@@ -72,9 +73,7 @@ def generate(parents,toolbox,size):
     offspring = list(map(toolbox.clone, selected_parents))
     for o in offspring:
         toolbox.mutate(o)
-        o.index= eg_ind.Individual.static_index
         o.nbr_eval = 0
-        eg_ind.Individual.static_index+=1
         # TODO only reset fitness to zero when mutation changes individual
         # Implement DEAP built in functionality
         o.fitness = eg_ind.Fitness()
@@ -109,18 +108,7 @@ def update_data(toolbox,population,gen,log_folder,config,plot=False,save=False):
         #         eg_ind.save_learning_ctrl_log(population,gen,log_folder)
         #         eg_ind.save_learning_ctrl_pop(population,gen,log_folder)
 
-def compute_novelty_scores(population,archive,config):
-    for ind in population:
-        if ind.novelty.valid:
-            continue
-        dist = nov.distances_parallel(population,archive,partial(eg_ind.morphological_distance,ind2=ind),cores=int(config["experiment"]["max_workers"]))
-        ind.novelty.values = nov.sparsness(dist),
-    for ind in population:
-        archive = nov.update_archive(ind,ind.novelty.values[0],archive,novelty_thr=float(config["novelty"]["nov_thres"]),adding_prob=float(config["novelty"]["adding_prob"]),arch_size=int(config["novelty"]["arch_max_size"]))
 
-def novelty_select(parents,size,archive,config):
-    compute_novelty_scores(parents,archive,config)
-    return tools.selTournament(parents,size,int(config["morphology"]["tournament_size"]),fit_attr="novelty")
 
 if __name__ == '__main__':    
     config = cp.ConfigParser()
@@ -129,7 +117,7 @@ if __name__ == '__main__':
         config.read(sys.argv[1])
         max_workers = int(sys.argv[2])
     else:
-        config.read("modular_2d_walker.cfg")
+        config.read("config/evo_gym.cfg")
         max_workers = int(sys.argv[1])
 
     config["experiment"]["max_workers"] = str(max_workers)
@@ -139,7 +127,7 @@ if __name__ == '__main__':
     foldername = ld.create_log_folder(log_folder,exp_name)
 
 
-    goal_select = config["experiment"].getboolean("goal_select")
+    # goal_select = config["experiment"].getboolean("goal_select")
     elitist_survival = config["experiment"].getboolean("elitist_survival")
 
     #define seed
@@ -158,17 +146,19 @@ if __name__ == '__main__':
     toolbox.register("eval", evaluate,config=config)
    
 
-    toolbox.register("mutate", eg_ind.Individual.mutate_morphology, mutation_rate=float(config["morphology"]["mut_rate"]),mut_sigma=float(config["morphology"]["sigma"]))
-    if goal_select: #Do a goal-based selection
-        toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
-    else: #Do a novelty selection.
-        toolbox.register("parent_select",novelty_select, archive=archive ,config=config)
+    toolbox.register("mutate", eg_ind.Individual.mutate, mutation_rate=float(config["morphology"]["mut_rate"]),num_attempts=int(config["morphology"]["num_attempts"]))
+    # if goal_select: #Do a goal-based selection
+    toolbox.register("parent_select",tools.selTournament,tournsize=int(config["morphology"]["tournament_size"]))
+
     if elitist_survival: #Do an elitist survival: remove the worst individual in term of fitness
         toolbox.register("death_select", elitist_select)
     else: #Do an age based survival: remove the oldest individual
         toolbox.register("death_select", age_select)
     toolbox.register("generate",generate)
-    toolbox.register("extra",update_data,log_folder=log_folder + "/" + foldername,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
+    def extra(toolbox,pop,iter):#no extra step
+        pass
+    toolbox.register("extra",extra)
+    #toolbox.register("extra",update_data,log_folder=log_folder + "/" + foldername,config=config,plot=bool(config["experiment"].getboolean("plot_prog")),save=config["experiment"].getboolean("save_logs"))
 
 
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
@@ -176,18 +166,20 @@ if __name__ == '__main__':
     stats.register("std", np.std)
     stats.register("min", np.min)
     stats.register("max", np.max)
-    if goal_select == False:
-        stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
-        stats_nov.register("avg", np.mean)
-        stats_nov.register("std", np.std)
-        stats_nov.register("min", np.min)
-        stats_nov.register("max", np.max)
+    # if goal_select == False:
+    #     stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
+    #     stats_nov.register("avg", np.mean)
+    #     stats_nov.register("std", np.std)
+    #     stats_nov.register("min", np.min)
+    #     stats_nov.register("max", np.max)
 
     with open(log_folder + "/" + foldername + "/config.cfg",'w') as configfile :
         config.write(configfile)
 
     evaluations_budget = int(config["experiment"]["evaluations_budget"])
     
+    print("setup finished")
+
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
     print("init finish, running for", evaluations_budget, "evaluations")
@@ -200,8 +192,6 @@ if __name__ == '__main__':
             for ind in new_inds:
                 nbr_eval += ind.nbr_eval
             print("fitness - ",stats.compile(pop))
-            if goal_select == False:
-                print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
             print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
 
     asynch_ea.terminate()

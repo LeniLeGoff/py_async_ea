@@ -33,7 +33,7 @@ def evaluate(individual, config):
 
     env = getEnv()
 
-    env.seed(int(config["experiment"]["seed"]))
+    env.seed(0)
     env.reset(tree=individual.tree, module_list=individual.tree.moduleList)
     it = 0
     for i in range(evaluation_steps):
@@ -53,14 +53,19 @@ def evaluate(individual, config):
         if reward > 0:
             individual.fitness.values = [reward]
 
-        time.sleep(0.001)
+        time.sleep(0.1)
 
     individual.nbr_eval += 1
     return individual.fitness.values
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
+        print("usage:")
+        print("\targ1 pickled population archive path")
+        print("\targ2 config file")
+        print("\targ3 individual index")
+        print("\targ4 controller index")
         exit(1)
         
     archived_pop_file = sys.argv[1]
@@ -69,11 +74,15 @@ if __name__ == '__main__':
     config.read(sys.argv[2])
 
     ind_index = int(sys.argv[3])
+    ctrl_index = int(sys.argv[4])
 
     population = load_population(archived_pop_file)
     base_ind = population[ind_index]
     del population
     base_ind.create_tree(config)
+    base_ind.set_controller_parameters(base_ind.ctrl_pop[ctrl_index])
+    print(base_ind.ctrl_pop[ctrl_index])
+    print("best fitness",np.argmax(base_ind.ctrl_log.select("fitness")[-1]),max(base_ind.ctrl_log.select("fitness")[-1]))
 
     print("controller parameters:",base_ind.get_controller_genome())
 

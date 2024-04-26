@@ -53,18 +53,20 @@ class Individual:
     def random(config):
         # creates a random individual based on the encoding type
         self = Individual()
+        self.index = Individual.static_index
+        Individual.static_index+=1
         self.structure, self.connections = sample_robot((5, 5))
         return self
 
     
-
-    def mutate(self,mutation_rate,num_attempts):
+    @staticmethod
+    def mutate(child,mutation_rate,num_attempts):
         pd = get_uniform(5)  
         pd[0] = 0.6 #it is 3X more likely for a cell to become empty
-        child = Individual()
-        child.clone(self)
-        structure = child.structure
-        connections = child.connections
+        child.index = Individual.static_index
+        Individual.static_index+=1
+        structure =  copy.copy(child.structure)
+        connections = copy.copy(child.connections)
         # iterate until valid robot found
         for n in range(num_attempts):
             # for every cell there is mutation_rate% chance of mutation
@@ -77,7 +79,6 @@ class Individual:
             if is_connected(structure) and has_actuator(structure):
                 child.structure = structure
                 child.connections = connections
-                return child,
+                return
+        return child
 
-        # no valid robot found after num_attempts
-        return None,

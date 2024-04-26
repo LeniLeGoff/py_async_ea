@@ -52,7 +52,7 @@ def evaluate(individual, config):
     env = getEnv()
     if config["controller"].getboolean("no_learning"):
         individual.create_tree(config)
-    env.seed(int(config["experiment"]["seed"]))
+    env.seed(0)
     env.reset(tree=individual.tree, module_list=individual.tree.moduleList)
     it = 0
     for i in range(evaluation_steps):
