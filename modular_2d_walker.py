@@ -14,7 +14,7 @@ from functools import partial
 from exception import LogExceptions
 import log_data as ld
 import asynch_ea as asynch
-from asynch_ea import print
+from asynch_ea import custom_print
 import ea_simple as ea
 
 import tools.novelty as nov
@@ -127,7 +127,7 @@ def age_select(pop,size):
     return sort_pop[:size]
 
 def generate(parents,toolbox,size):
-    print("tournament")
+    custom_print("tournament")
     selected_parents = toolbox.parent_select(parents, size)
 
     # deep copy of selected population
@@ -281,7 +281,7 @@ if __name__ == '__main__':
     
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
-    print("init finish, running for", evaluations_budget, "evaluations")
+    custom_print("init finish, running for", evaluations_budget, "evaluations")
     nbr_eval = 0
     for ind in pop:
         nbr_eval += ind.nbr_eval
@@ -293,11 +293,11 @@ if __name__ == '__main__':
             eval_index_data.add_data(new_idx)
             for ind in new_inds:
                 nbr_eval += ind.nbr_eval
-            print("fitness - ",stats.compile(pop))
+            custom_print("fitness - ", stats.compile(pop))
             if select_type == "novelty":
-                print("novelty - ",stats_nov.compile(pop),"archive size :", len(archive))
-            print("nbr eval",nbr_eval)
-            print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
+                custom_print("novelty - ", stats_nov.compile(pop), "archive size :", len(archive))
+            custom_print("nbr eval", nbr_eval)
+            custom_print("progress :", float(nbr_eval) / float(evaluations_budget) * 100, "%")
 
     asynch_ea.terminate()
-    print("EA has terminated normaly")
+    custom_print("EA has terminated normaly")

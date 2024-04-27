@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import multineat
 import numpy as np
+from dataclasses import dataclass
+from revolve2.ci_group.genotypes.cppnwin.modular_robot import BrainGenotypeCpg
+from revolve2.ci_group.genotypes.cppnwin.modular_robot.v2 import BodyGenotypeV2
+from revolve2.modular_robot import ModularRobot
 
-from revolve.ci_group.genotypes.cppnwin.modular_robot import BrainGenotypeCpgOrm
-from revolve.ci_group.genotypes.cppnwin.modular_robot.v2 import BodyGenotypeOrmV2
-from revolve.modular_robot import ModularRobot
 
+@dataclass
+class Genotype(BodyGenotypeV2, BrainGenotypeCpg):
+    """A genotype for a body and brain using CPPN."""
 
-class Genotype(BodyGenotypeOrmV2, BrainGenotypeCpgOrm):
     @classmethod
     def random(
         cls,

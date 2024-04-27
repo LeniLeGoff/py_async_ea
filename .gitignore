@@ -1,0 +1,5 @@
+# IDE Folders
+.idea/
+**\log.txt
+**/__pycache__/
+logs/

@@ -1,13 +1,14 @@
 #! /usr/bin/python3
 import sys
-import random as rd
-import multiprocessing as mp
 from nestable_pool import NestablePool
 from deap import algorithms
 from exception import LogExceptions
 import builtins
+from typing import TypeVar, Callable
 
-def print(*objects):
+TIndividual = TypeVar("TIndividual")
+
+def custom_print(*objects):
     string = "" 
     for o in objects:
         string += str(o) + " "
@@ -28,41 +29,39 @@ def generate(parents,toolbox,size):
         return offspring
 
 class AsynchEA:
-    def __init__(self,pop_size,nb_workers,sync=0):
+    def __init__(self,pop_size,nb_workers,sync=0) -> None:
         self.pop_size = pop_size
         self.nbr_ind_to_wait = int(pop_size)*sync
         if sync == 0:
             self.nbr_ind_to_wait = 1
-        print("number ind to wait:", self.nbr_ind_to_wait)
-        self.parents = []
-        self.pop = []
-        self.evaluated_ind = []
+        custom_print("number ind to wait:", self.nbr_ind_to_wait)
         self.iteration = 0
         self.max_workers = nb_workers
         self.pool = NestablePool(processes=nb_workers)#,maxtasksperchild=100)
-        self.in_evaluation = []
+        self.in_evaluation: list[TIndividual] = []
+        self.parents: list[TIndividual] = []
+        self.pop: list[TIndividual] = []
+        self.evaluated_ind: list[TIndividual] = []
         self.workers_failed = False
 
-    def remove(self,select):
+    def remove(self, select: Callable) -> None:
         dead = select(self.parents,len(self.parents)-self.pop_size)
         for ind in dead:
             self.parents.remove(ind) 
             del ind
 
-    def worker_callback(self,results):     
-        if results == None:
+    def worker_callback(self, results: TIndividual) -> None:
+        if results is None:
             self.workers_failed = True
         else:
             self.evaluated_ind.append(results)
-            self.in_evaluation.remove(results)
+            to_remove = [elem for elem in self.in_evaluation if elem.uuid == results.uuid]
+            for individual in to_remove:
+                self.in_evaluation.remove(individual)
 
-    def asynch_map(self,eval):
+    def asynch_map(self, eval: Callable) -> None:
         for ind in self.pop:
-            is_new_ind = True
-            for e_ind in self.in_evaluation + self.evaluated_ind:
-                if e_ind == ind:
-                    is_new_ind = False
-                    break
+            is_new_ind = False if ind in self.in_evaluation or ind in self.evaluated_ind else True
             if is_new_ind and len(self.in_evaluation) < self.max_workers:
                 #print("ind",ind.index,"send to evaluation")
                 self.in_evaluation.append(ind)
@@ -71,12 +70,12 @@ class AsynchEA:
                 break
 
     #sequential execution. Use only for debugging
-    def seq_map(self,eval):
+    def seq_map(self, eval: Callable) -> None:
         for ind in self.pop:
             results = eval(ind)
             self.evaluated_ind.append(results)
             
-    def update(self,eval):
+    def update(self, eval: Callable) -> list[TIndividual]:
         # Evaluate the individuals with asynch map. Evaluate as to return a ref to the ind at the end
         #self.seq_map(eval)
         self.asynch_map(eval)
@@ -85,38 +84,37 @@ class AsynchEA:
             sys.exit("Exiting because of workers crash")
 
         if len(self.evaluated_ind) >= self.nbr_ind_to_wait:
-            print("number individual evaluated",len(self.evaluated_ind))
+            custom_print("number individual evaluated",len(self.evaluated_ind))
             for e_ind in self.evaluated_ind:
-                for i in range(len(self.pop)):
-                    if self.pop[i] == e_ind:
+                for i, candidate in enumerate(self.pop):
+                    if candidate.uuid == e_ind.uuid:
                         self.pop[i] = e_ind
                         break
             del self.evaluated_ind
             self.evaluated_ind = []
     
         new_parents = [ind for ind in self.pop if ind.fitness.valid]
-        if(len(new_parents) > 0):
-            print("new_parents",[ind.index for ind in new_parents])
+        if len(new_parents) > 0:
+            custom_print("new_parents", [ind.index for ind in new_parents])
         for ind in new_parents:
             self.pop.remove(ind)
-
         return new_parents
 
-    def init(self,toolbox):
+    def init(self,toolbox) -> list[TIndividual]:
         #initialisation
         self.pop = toolbox.population(self.pop_size)
         while len(self.parents) < self.pop_size:
             new_par = self.update(toolbox.eval)
             self.parents = self.parents + new_par
-            if(len(new_par) > 0):
-                print("init progress:",float(len(self.parents))/float(self.pop_size)*100,"%")
-        assert(len(self.pop) == 0)
+            if len(new_par) > 0:
+                custom_print("init progress:", float(len(self.parents)) / float(self.pop_size) * 100, "%")
+        assert len(self.pop) == 0, "Error: population contains robots still."
         self.pop = toolbox.generate(self.parents,toolbox,self.pop_size)
-        print(len(self.pop))
+        custom_print(len(self.pop))
         toolbox.extra(toolbox,self.parents,self.iteration)
         return self.parents
 
-    def step(self,toolbox):
+    def step(self,toolbox) -> tuple[list[TIndividual], list[TIndividual]]:
         #update - evaluation
         new_par = self.update(toolbox.eval)
         if len(new_par) > 0:
@@ -135,6 +133,6 @@ class AsynchEA:
 
         return self.parents, new_par
 
-    def terminate(self):
+    def terminate(self) -> None:
         self.pool.terminate()
         self.pool.join()

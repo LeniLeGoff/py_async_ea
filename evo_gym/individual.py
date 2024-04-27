@@ -2,6 +2,8 @@ import sys
 import os
 import copy
 import pickle
+from uuid import UUID, uuid1
+
 
 from deap import base
 import numpy as np
@@ -30,6 +32,7 @@ class Individual:
         self.shape = robot_shape
         self.structure = np.zeros(robot_shape)
         self.connections = get_full_connectivity(self.structure)
+        self.uuid = uuid1()
 
 
     def __eq__(self, other):
@@ -38,6 +41,7 @@ class Individual:
     @staticmethod
     def clone(individual):
         self = copy.deepcopy(individual)
+        self.uuid = uuid1()
         return self
 
     @staticmethod

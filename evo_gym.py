@@ -17,7 +17,7 @@ from functools import partial
 
 import log_data as ld
 import asynch_ea as asynch
-from asynch_ea import print
+from asynch_ea import custom_print
 
 
 from deap import base,tools
@@ -66,7 +66,7 @@ def age_select(pop,size):
     return sort_pop[:size]
 
 def generate(parents,toolbox,size):
-    print("tournament")
+    custom_print("tournament")
     selected_parents = toolbox.parent_select(parents, size)
 
     # deep copy of selected population
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     foldername = ld.create_log_folder(log_folder,exp_name)
 
 
-    # goal_select = config["experiment"].getboolean("goal_select")
+    goal_select = config["experiment"].getboolean("goal_select")
     elitist_survival = config["experiment"].getboolean("elitist_survival")
 
     #define seed
@@ -166,12 +166,12 @@ if __name__ == '__main__':
     stats.register("std", np.std)
     stats.register("min", np.min)
     stats.register("max", np.max)
-    # if goal_select == False:
-    #     stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
-    #     stats_nov.register("avg", np.mean)
-    #     stats_nov.register("std", np.std)
-    #     stats_nov.register("min", np.min)
-    #     stats_nov.register("max", np.max)
+    if not goal_select:
+        stats_nov = tools.Statistics(key=lambda ind: ind.novelty.values)
+        stats_nov.register("avg", np.mean)
+        stats_nov.register("std", np.std)
+        stats_nov.register("min", np.min)
+        stats_nov.register("max", np.max)
 
     with open(log_folder + "/" + foldername + "/config.cfg",'w') as configfile :
         config.write(configfile)
@@ -182,7 +182,7 @@ if __name__ == '__main__':
 
     asynch_ea = asynch.AsynchEA(int(config["morphology"]["pop_size"]),max_workers,sync=float(config["morphology"]["synch"]))
     pop = asynch_ea.init(toolbox)
-    print("init finish, running for", evaluations_budget, "evaluations")
+    custom_print("init finish, running for", evaluations_budget, "evaluations")
     nbr_eval = 0
     for ind in pop:
         nbr_eval += ind.nbr_eval
@@ -191,8 +191,10 @@ if __name__ == '__main__':
         if len(new_inds) > 0:
             for ind in new_inds:
                 nbr_eval += ind.nbr_eval
-            print("fitness - ",stats.compile(pop))
-            print("progress :",float(nbr_eval)/float(evaluations_budget)*100,"%")
+            custom_print("fitness - ", stats.compile(pop))
+            if not goal_select:
+                custom_print("novelty - ", stats_nov.compile(pop), "archive size :", len(archive))
+            custom_print("progress :", float(nbr_eval) / float(evaluations_budget) * 100, "%")
 
     asynch_ea.terminate()
-    print("EA has terminated normaly")
+    custom_print("EA has terminated normaly")
