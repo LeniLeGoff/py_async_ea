@@ -12,11 +12,10 @@ from functools import partial
 from exception import LogExceptions
 import log_data as ld
 import asynch_ea as asynch
-from asynch_ea import custom_print as print_async
 import ea_simple as ea
 import tools.novelty as nov
 from deap import base, tools
-from revolve import *
+from revolve import Individual, Metric, save_learning_ctrl_pop, save_learning_ctrl_log, morphological_distance
 
 from revolve2.ci_group.terrains import flat
 from revolve2.experimentation.logging import setup_logging

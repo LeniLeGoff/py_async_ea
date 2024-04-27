@@ -5,7 +5,6 @@ import multineat
 import numpy as np
 import copy
 from ._genotype import Genotype
-from dataclasses import dataclass, field
 
 from revolve2.experimentation.rng import make_rng_time_seed
 from revolve2.ci_group.genotypes.cppnwin.modular_robot import BrainGenotypeCpg
@@ -15,31 +14,52 @@ class Metric(base.Fitness):
     def __init__(self) -> None:
         self.weights=[1.0]
 
-@dataclass
 class Individual:
     """A Revolve2 Individual"""
-    """Counter Variables"""
-    static_index: int = field(default=0)
-    index: int = field(default=0)
-    nbr_eval: int = field(default=0)
+    static_index: int = 0
+    def __init__(
+            self,
+            index: int = 0,
+            nbr_eval: int = 0,
+            age: int = 0,
+            genotype: Genotype | None = None,
+            fitness: Metric | None = None,
+            novelty: Metric | None = None,
+            learning_delta: Metric | None = None,
+            rng: np.random.Generator | None = None,
+            uuid: UUID  | None = None,
+            ctrl_log=None,
+            ctrl_pop = None,
+            tree = None,
+    ) -> None:
+        """
+        Initialize the Revolve2 Individual.
 
-    """Individual specific values."""
-    age: int = field(default=0)
-    genotype: Genotype | None = field(default=None)
-
-    """Evaluation Measures."""
-    novelty: Metric = field(default_factory=lambda: Metric())
-    fitness: Metric = field(default_factory=lambda: Metric())
-    learning_delta: Metric = field(default_factory=lambda: Metric())
-
-    """Auxiliary varibables."""
-    rng: np.random.Generator = field(default_factory=lambda: make_rng_time_seed())
-    uuid: UUID = field(default_factory=lambda: uuid1())
-
-    """Not sure yet what thoese are."""
-    ctrl_log = None
-    ctrl_pop = None
-    tree = None
+        :param index: The index of the individual.
+        :param nbr_eval: The number of evaluations done by the individual.
+        :param age: The age of the individual.
+        :param genotype: The genotype.
+        :param fitness: The fitness metric.
+        :param novelty: The novelty metric.
+        :param learning_delta: The learning delta.
+        :param rng: The rng generator.
+        :param uuid: The objects UUID.
+        :param ctrl_pop: IDK.
+        :param ctrl_log: IDK.
+        :param tree: The tree representation of the individual.
+        """
+        self.index = index
+        self.nbr_eval = nbr_eval
+        self.age = age
+        self.genotype = genotype
+        self.fitness = fitness if fitness is not None else Metric()
+        self.novelty = novelty if novelty is not None else Metric()
+        self.learning_delta = learning_delta if learning_delta is not None else Metric()
+        self.rng = rng if rng is not None else make_rng_time_seed()
+        self.uuid = uuid if uuid is not None else uuid1()
+        self.ctrl_log = ctrl_log
+        self.ctrl_pop = ctrl_pop
+        self.tree = tree
 
     @staticmethod
     def clone(individual: Individual) -> Individual:
@@ -61,7 +81,8 @@ class Individual:
         :param dbs: The innovation databases.
         :returns: The individual.
         """
-        individual = Individual()
+        individual = Individual(index=Individual.static_index)
+        Individual.static_index += 1
         individual.genotype = Genotype.random(*dbs, rng=make_rng_time_seed())
         return individual
 
@@ -125,4 +146,7 @@ class Individual:
 
     def get_controller_genome(self):
         return self.genotype.brain
+
+    def __eq__(self, other: Individual) -> bool:
+        return self.index == other.index
 
