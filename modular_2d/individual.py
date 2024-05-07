@@ -2,6 +2,7 @@ import sys
 import os
 import copy
 import pickle
+from uuid import UUID, uuid1
 
 from deap import base
 
@@ -38,6 +39,7 @@ class Individual:
         self.nbr_eval = 0
         self.index = 0
         self.tree = None
+        self.uuid: UUID = uuid1()
 
     def __eq__(self, other):
         return self.index == other
@@ -45,6 +47,7 @@ class Individual:
     @staticmethod
     def clone(individual):
         self = copy.deepcopy(individual)
+        self.uuid = uuid1()
         return self
 
     @staticmethod
