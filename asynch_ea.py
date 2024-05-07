@@ -87,7 +87,7 @@ class AsynchEA:
             custom_print("number individual evaluated",len(self.evaluated_ind))
             for e_ind in self.evaluated_ind:
                 for i, candidate in enumerate(self.pop):
-                    if candidate.uuid == e_ind.uuid:
+                    if candidate == e_ind:
                         self.pop[i] = e_ind
                         break
             del self.evaluated_ind
